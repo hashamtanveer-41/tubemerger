@@ -28,3 +28,20 @@
 ::-webkit-scrollbar-thumb:hover {
   background: #555555;
 }
+
+.spotlight-active-element {
+  position: relative !important;
+  z-index: 54 !important;
+}
+
+select {
+  background-color: #202020 !important;
+  color: #FFFFFF !important;
+}
+
+option {
+  background-color: #202020 !important;
+  color: #FFFFFF !important;
+}
+
+

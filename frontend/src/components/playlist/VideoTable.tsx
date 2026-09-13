@@ -2,7 +2,8 @@ import React from 'react';
 import { VideoClip } from '@/types';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { Youtube } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Youtube, CheckSquare, Square } from 'lucide-react';
 import { VIDEO_CARD_GRADIENTS } from '@/data/gradients';
 import { formatBytes, estimateVideoSizeBytes } from '@/lib/utils';
 
@@ -11,23 +12,62 @@ interface VideoTableProps {
   selectedIndices: Set<number>;
   onToggle: (index: number) => void;
   quality?: string;
+  format?: 'mp4' | 'mp3';
+  onSelectAll?: () => void;
+  onDeselectAll?: () => void;
 }
 
-export function VideoTable({ videos, selectedIndices, onToggle, quality }: VideoTableProps) {
+export function VideoTable({
+  videos,
+  selectedIndices,
+  onToggle,
+  quality,
+  format,
+  onSelectAll,
+  onDeselectAll,
+}: VideoTableProps) {
+  const isAudio = format === 'mp3' || (quality && ['320k', '256k', '192k', '128k', 'mp3'].includes(quality.toLowerCase()));
+  const audioBitrateLabel = quality && ['320k', '256k', '192k', '128k'].includes(quality.toLowerCase())
+    ? `${quality.toLowerCase().replace('k', '')}kbps`
+    : '320kbps';
   return (
     <div className="space-y-3 select-none">
-      <div className="flex items-center justify-between px-1">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-1">
         <div>
           <h3 className="text-sm font-semibold uppercase tracking-wider text-brand-red">
-            Merge Your Playlists
+            Videos in Playlist
           </h3>
           <p className="text-xs text-content-muted">
-            Select the video clips you want to include in the merged output.
+            Select the video clips you want to include in the output.
           </p>
         </div>
-        <span className="text-xs font-medium text-content-dim">
-          {selectedIndices.size} / {videos.length} selected
-        </span>
+        <div className="flex items-center gap-2 shrink-0">
+          {onSelectAll && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onSelectAll}
+              icon={CheckSquare}
+              className="text-xs h-8 px-3 border-stroke-light text-content-secondary hover:text-content-primary hover:bg-theme-elevated hover:border-stroke-light focus:outline-none focus:ring-0 active:scale-100 cursor-pointer"
+            >
+              Select All
+            </Button>
+          )}
+          {onDeselectAll && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onDeselectAll}
+              icon={Square}
+              className="text-xs h-8 px-3 border-stroke-light text-content-secondary hover:text-content-primary hover:bg-theme-elevated hover:border-stroke-light focus:outline-none focus:ring-0 active:scale-100 cursor-pointer"
+            >
+              Clear Selection
+            </Button>
+          )}
+          <span className="text-xs font-medium text-content-dim ml-1">
+            {selectedIndices.size} / {videos.length} selected
+          </span>
+        </div>
       </div>
 
       <div className="rounded-2xl border border-stroke-card bg-theme-surface divide-y divide-stroke-subtle overflow-hidden shadow-lg">
@@ -67,7 +107,7 @@ export function VideoTable({ videos, selectedIndices, onToggle, quality }: Video
                   />
                 ) : null}
                 <Badge variant="overlay" className="relative z-10 text-[9px] font-semibold tracking-wide">
-                  {video.resolution_label || '1080p'}
+                  {isAudio ? `MP3 ${quality && ['320k', '256k', '192k', '128k'].includes(quality.toLowerCase()) ? quality.toUpperCase() : '320K'}` : (video.resolution_label || '1080p')}
                 </Badge>
               </div>
 
@@ -81,7 +121,7 @@ export function VideoTable({ videos, selectedIndices, onToggle, quality }: Video
                   <span className="text-content-dim">·</span>
                   <span className="text-zinc-300 font-medium">~{estimatedSize}</span>
                   <span className="text-content-dim">·</span>
-                  <span>AAC 192kbps</span>
+                  <span>{isAudio ? `MP3 ${audioBitrateLabel}` : 'AAC 192kbps'}</span>
                 </p>
               </div>
 

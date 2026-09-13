@@ -30,6 +30,7 @@ export type PipelineStatus =
   | 'idle'
   | 'fetching'
   | 'downloading'
+  | 'paused'
   | 'normalizing'
   | 'stitching'
   | 'embedding_chapters'

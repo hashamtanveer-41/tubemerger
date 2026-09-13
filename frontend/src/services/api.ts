@@ -131,8 +131,23 @@ export class ApiClient {
 
     const data = await res.json();
     if (!res.ok) {
-      const errMsg = (data.detail && (data.detail.error || data.detail)) || data.error || data.message || 'Failed to fetch playlist';
-      throw new Error(errMsg);
+      let errMsg = 'Failed to fetch playlist.';
+      let errTitle = 'Action Error';
+
+      if (data.detail && typeof data.detail === 'object') {
+        errMsg = data.detail.error || data.detail.message || JSON.stringify(data.detail);
+        errTitle = data.detail.title || 'Action Error';
+      } else if (typeof data.detail === 'string') {
+        errMsg = data.detail;
+      } else if (data.error) {
+        errMsg = data.error;
+      }
+
+      // Clean up any double/nested prefixes
+      errMsg = errMsg.replace(/^(Failed to fetch playlist:\s*)+/i, '').trim();
+      const err = new Error(errMsg);
+      (err as any).title = errTitle;
+      throw err;
     }
     return data;
   }
@@ -144,6 +159,7 @@ export class ApiClient {
     merge_videos?: boolean;
     quality?: string;
     canvas_preset?: string;
+    format?: 'mp4' | 'mp3';
   }): Promise<{ status: string; job_id: string }> {
     const res = await fetch(`${this.baseUrl}/api/start-merge`, {
       method: 'POST',
@@ -157,6 +173,24 @@ export class ApiClient {
       throw new Error(errMsg);
     }
     return data;
+  }
+
+  async pauseMerge(): Promise<{ status: string; message: string }> {
+    const res = await fetch(`${this.baseUrl}/api/pause`, { method: 'POST', headers: this.getAuthHeaders() });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.detail?.error || data.message || `Failed to pause download (${res.status})`);
+    }
+    return res.json();
+  }
+
+  async resumeMerge(): Promise<{ status: string; message: string }> {
+    const res = await fetch(`${this.baseUrl}/api/resume`, { method: 'POST', headers: this.getAuthHeaders() });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.detail?.error || data.message || `Failed to resume download (${res.status})`);
+    }
+    return res.json();
   }
 
   async cancelMerge(): Promise<void> {
@@ -272,8 +306,22 @@ export class ApiClient {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(item),
     });
-    if (!res.ok) throw new Error('Failed to enqueue playlist');
-    return res.json();
+    const data = await res.json();
+    if (!res.ok) {
+      let errMsg = 'Failed to enqueue playlist.';
+      let errTitle = 'Queue Error';
+      if (data.detail && typeof data.detail === 'object') {
+        errMsg = data.detail.error || data.detail.message || JSON.stringify(data.detail);
+        errTitle = data.detail.title || errTitle;
+      } else if (typeof data.detail === 'string') {
+        errMsg = data.detail;
+      }
+      errMsg = errMsg.replace(/^(Failed to add to queue:\s*)+/i, '').trim();
+      const err = new Error(errMsg);
+      (err as any).title = errTitle;
+      throw err;
+    }
+    return data;
   }
 
   async deleteQueueItem(id: number): Promise<void> {
@@ -476,8 +524,11 @@ export class ApiClient {
     };
 
     eventSource.onerror = (e) => {
-      if (onError) onError(e);
-      eventSource.close();
+      // In browsers, EventSource auto-reconnects on transient connection drops (readyState === CONNECTING).
+      // Only invoke onError and tear down if the connection was permanently closed.
+      if (eventSource.readyState === EventSource.CLOSED) {
+        if (onError) onError(e);
+      }
     };
 
     return () => {

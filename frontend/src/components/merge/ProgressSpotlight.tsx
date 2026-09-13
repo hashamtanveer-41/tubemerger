@@ -1,46 +1,94 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { ProgressEvent, VideoClip } from '@/types';
 import { Card } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
-import { CheckCircle2, Circle, PlayCircle, XCircle, ArrowDown } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { CheckCircle2, Circle, PlayCircle, XCircle, ArrowDown, Pause, Play } from 'lucide-react';
 
 interface ProgressSpotlightProps {
   progress: ProgressEvent;
   selectedClips: VideoClip[];
   onCancel: () => void;
+  isPaused?: boolean;
+  onPause?: () => void;
+  onResume?: () => void;
 }
 
-export function ProgressSpotlight({ progress, selectedClips, onCancel }: ProgressSpotlightProps) {
+export function ProgressSpotlight({
+  progress,
+  selectedClips,
+  onCancel,
+  isPaused = false,
+  onPause,
+  onResume,
+}: ProgressSpotlightProps) {
   const currentIdx = progress.current_item || 1;
   const currentClip = selectedClips[currentIdx - 1];
+  const [cancelClicked, setCancelClicked] = useState(false);
 
   return (
     <Card className="p-6 space-y-6 border-stroke-card bg-theme-surface select-none shadow-2xl max-w-4xl mx-auto">
       {/* Top Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-3">
-          <Spinner size="md" variant="red" />
-          <div>
-            <h2 className="text-base font-semibold text-content-primary leading-tight">
-              Merge in Progress
-            </h2>
-            <p className="text-xs text-content-muted mt-0.5">
-              Encoding your selected clips into a single continuous video with chapters.
-            </p>
-          </div>
+          {isPaused ? (
+            <div className="w-6 h-6 rounded-full bg-brand-red/20 text-brand-red flex items-center justify-center">
+              <Pause className="w-3.5 h-3.5 text-brand-red fill-brand-red" />
+            </div>
+          ) : (
+            <Spinner size="md" variant="red" />
+          )}
+          <h2 className="text-base font-semibold text-content-primary leading-tight">
+            {isPaused ? 'Download Paused' : 'Download in Progress'}
+          </h2>
         </div>
 
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onCancel}
-          icon={XCircle}
-          className="text-xs border-stroke-light hover:text-red-400 hover:border-red-900"
-        >
-          Cancel
-        </Button>
+        <div className="flex items-center gap-2">
+          {isPaused ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onResume}
+              className="text-xs border-[#333333] hover:border-brand-red/60 text-content-primary hover:text-white hover:bg-[#1E1E1E] cursor-pointer"
+            >
+              <Play className="w-3.5 h-3.5 mr-1.5 text-brand-red fill-brand-red" />
+              <span>Resume</span>
+            </Button>
+          ) : (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onPause}
+              className="text-xs border-[#333333] hover:border-[#555555] active:border-brand-red text-content-secondary hover:text-white hover:bg-[#1E1E1E] group cursor-pointer"
+            >
+              <Pause className="w-3.5 h-3.5 mr-1.5 text-white fill-white group-hover:text-white group-active:text-brand-red group-active:fill-brand-red transition-colors" />
+              <span>Pause</span>
+            </Button>
+          )}
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setCancelClicked(true);
+              onCancel();
+            }}
+            className={cn(
+              "text-xs border-[#333333] hover:border-[#555555] active:border-brand-red text-content-secondary hover:text-white hover:bg-[#1E1E1E] group cursor-pointer",
+              cancelClicked && "border-brand-red text-white"
+            )}
+          >
+            <XCircle
+              className={cn(
+                "w-3.5 h-3.5 mr-1.5 transition-colors",
+                cancelClicked ? "text-brand-red" : "text-white group-hover:text-white group-active:text-brand-red"
+              )}
+            />
+            <span>Cancel</span>
+          </Button>
+        </div>
       </div>
 
       {/* Overall Progress Bar with Live Download Speed */}
@@ -48,12 +96,17 @@ export function ProgressSpotlight({ progress, selectedClips, onCancel }: Progres
         <div className="flex justify-between items-center text-xs">
           <div className="flex items-center gap-2.5">
             <span className="text-content-secondary font-medium">Overall Progress</span>
-            {progress.speed && (
+            {isPaused ? (
+              <span className="text-[11px] font-semibold text-brand-red bg-black border border-brand-red/40 px-2.5 py-0.5 rounded-full flex items-center gap-1 shadow-md shadow-black/80 animate-in fade-in duration-150">
+                <Pause className="w-3 h-3 text-brand-red fill-brand-red" />
+                <span>Paused</span>
+              </span>
+            ) : progress.speed ? (
               <span className="text-[11px] font-semibold text-brand-red bg-black border border-brand-red/40 px-2.5 py-0.5 rounded-full flex items-center gap-1 shadow-md shadow-black/80 animate-in fade-in duration-150">
                 <ArrowDown className="w-3 h-3 text-brand-red stroke-[2.5]" />
                 <span>{progress.speed}</span>
               </span>
-            )}
+            ) : null}
           </div>
           <span className="text-content-primary font-semibold text-sm font-mono">
             {progress.overall_percent}%
@@ -73,10 +126,16 @@ export function ProgressSpotlight({ progress, selectedClips, onCancel }: Progres
                 className="w-full h-full object-cover"
               />
             ) : (
-              <PlayCircle className="w-6 h-6 text-content-dim" />
+              <PlayCircle className="w-6 h-6 text-brand-red" />
             )}
-            <span className="absolute inset-0 bg-black/30 flex items-center justify-center">
-              <Spinner size="xs" variant="white" />
+            <span className="absolute inset-0 bg-black/40 flex items-center justify-center">
+              {isPaused ? (
+                <div className="w-6 h-6 rounded-full bg-black/60 border border-brand-red/50 text-brand-red flex items-center justify-center shadow-lg">
+                  <Pause className="w-3.5 h-3.5 text-brand-red fill-brand-red" />
+                </div>
+              ) : (
+                <Spinner size="xs" variant="red" />
+              )}
             </span>
           </div>
 
@@ -130,13 +189,17 @@ export function ProgressSpotlight({ progress, selectedClips, onCancel }: Progres
                   <span className="text-content-muted text-xs">{clip.duration_formatted}</span>
                   <div
                     className="w-5 h-5 flex items-center justify-center"
-                    title={isDone ? 'Completed' : isActive ? 'Active' : isError ? 'Failed' : 'Pending'}
+                    title={isDone ? 'Completed' : isActive ? (isPaused ? 'Paused' : 'Active') : isError ? 'Failed' : 'Pending'}
                   >
                     {isDone && (
                       <CheckCircle2 className="w-4 h-4 text-brand-red stroke-[2.2]" />
                     )}
                     {isActive && (
-                      <Spinner size="xs" variant="red" />
+                      isPaused ? (
+                        <Pause className="w-3.5 h-3.5 text-brand-red fill-brand-red" />
+                      ) : (
+                        <Spinner size="xs" variant="red" />
+                      )
                     )}
                     {isError && (
                       <XCircle className="w-4 h-4 text-brand-red stroke-[2.2]" />

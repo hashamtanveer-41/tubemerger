@@ -2,7 +2,7 @@ import React from 'react';
 import { Playlist } from '@/types';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Film, Clock, HardDrive, CheckSquare, Square } from 'lucide-react';
+import { Film, Clock, HardDrive, ArrowLeft, Trash2 } from 'lucide-react';
 import { formatBytes, estimateVideoSizeBytes } from '@/lib/utils';
 
 interface PlaylistCardProps {
@@ -11,8 +11,9 @@ interface PlaylistCardProps {
   totalCount: number;
   selectedIndices?: Set<number>;
   quality?: string;
-  onSelectAll: () => void;
-  onDeselectAll: () => void;
+  format?: 'mp4' | 'mp3';
+  onClearPlaylist?: () => void;
+  onBackToHome?: () => void;
 }
 
 export function PlaylistCard({
@@ -21,8 +22,9 @@ export function PlaylistCard({
   totalCount,
   selectedIndices,
   quality,
-  onSelectAll,
-  onDeselectAll,
+  format,
+  onClearPlaylist,
+  onBackToHome,
 }: PlaylistCardProps) {
   const thumbUrl = playlist.thumbnail || (playlist.entries[0] && (playlist.entries[0].thumbnail_url || playlist.entries[0].thumbnail)) || '';
 
@@ -89,26 +91,30 @@ export function PlaylistCard({
         </div>
       </div>
 
-      {/* Select / Clear Controls */}
-      <div className="flex items-center gap-2 shrink-0 self-end md:self-center">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onSelectAll}
-          icon={CheckSquare}
-          className="text-xs h-8 px-3 border-stroke-light text-content-secondary hover:text-content-primary hover:bg-theme-elevated hover:border-stroke-light focus:outline-none focus:ring-0 active:scale-100"
-        >
-          Select All
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onDeselectAll}
-          icon={Square}
-          className="text-xs h-8 px-3 border-stroke-light text-content-secondary hover:text-content-primary hover:bg-theme-elevated hover:border-stroke-light focus:outline-none focus:ring-0 active:scale-100"
-        >
-          Clear
-        </Button>
+      {/* Action Controls: Clear Playlist and Back to Home */}
+      <div className="flex items-center gap-2.5 shrink-0 self-end md:self-center">
+        {onClearPlaylist && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onClearPlaylist}
+            icon={Trash2}
+            className="text-xs h-8 px-3 border-stroke-light text-content-secondary hover:text-red-400 hover:bg-theme-elevated hover:border-red-900/50 focus:outline-none focus:ring-0 active:scale-100 cursor-pointer"
+          >
+            Clear Playlist
+          </Button>
+        )}
+        {onBackToHome && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onBackToHome}
+            icon={ArrowLeft}
+            className="text-xs h-8 px-3 border-stroke-light text-content-secondary hover:text-content-primary hover:bg-theme-elevated hover:border-stroke-light focus:outline-none focus:ring-0 active:scale-100 cursor-pointer"
+          >
+            Back to Home
+          </Button>
+        )}
       </div>
     </Card>
   );

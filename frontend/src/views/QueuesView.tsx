@@ -16,9 +16,10 @@ interface QueuesViewProps {
   onStartMergeUrl: (url: string) => void;
   isMerging?: boolean;
   activeUrl?: string;
+  onShowToast?: (message: string, type?: 'error' | 'success' | 'info', title?: string) => void;
 }
 
-export function QueuesView({ onStartMergeUrl, isMerging = false, activeUrl }: QueuesViewProps) {
+export function QueuesView({ onStartMergeUrl, isMerging = false, activeUrl, onShowToast }: QueuesViewProps) {
   const [queues, setQueues] = useState<QueueItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [newUrl, setNewUrl] = useState('');
@@ -43,17 +44,39 @@ export function QueuesView({ onStartMergeUrl, isMerging = false, activeUrl }: Qu
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newUrl.trim() || adding) return;
+    const cleanUrl = newUrl.trim();
+    if (!cleanUrl || adding) return;
+
+    const lower = cleanUrl.toLowerCase();
+    if (lower.includes('spotify.com')) {
+      onShowToast?.(
+        'Spotify playlists cannot be queued because Spotify streams are protected by DRM encryption. Please queue YouTube links.',
+        'error',
+        'Spotify Not Supported'
+      );
+      return;
+    }
+    if (lower.includes('music.apple.com') || lower.includes('itunes.apple.com')) {
+      onShowToast?.(
+        'Apple Music playlists cannot be queued because streams are DRM-protected. Please queue YouTube links.',
+        'error',
+        'Apple Music Not Supported'
+      );
+      return;
+    }
+
     try {
       setAdding(true);
       const item = await api.enqueuePlaylist({
-        playlist_url: newUrl.trim(),
+        playlist_url: cleanUrl,
         playlist_title: 'Queued Playlist',
       });
       setQueues((prev) => [...prev, item as QueueItem]);
       setNewUrl('');
-    } catch (err) {
+      onShowToast?.('Playlist added to batch queue.', 'success', 'Added to Queue');
+    } catch (err: any) {
       console.error('Failed to add to queue:', err);
+      onShowToast?.(err.message || 'Failed to add playlist to queue.', 'error', err.title || 'Queue Error');
     } finally {
       setAdding(false);
     }
@@ -71,17 +94,8 @@ export function QueuesView({ onStartMergeUrl, isMerging = false, activeUrl }: Qu
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center h-96 space-y-3">
-        <Spinner size="lg" variant="red" />
-        <p className="text-xs text-[#888888]">Loading SQLite merge queues…</p>
-      </div>
-    );
-  }
-
   return (
-    <div className="max-w-5xl mx-auto space-y-6 select-none animate-in fade-in duration-200 pb-16">
+    <div id="queues-view-container" className="max-w-5xl mx-auto space-y-6 select-none animate-in fade-in duration-200 pb-16">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[#242424]">
         <div>
@@ -95,11 +109,19 @@ export function QueuesView({ onStartMergeUrl, isMerging = false, activeUrl }: Qu
         </div>
       </div>
 
+      {loading ? (
+        <div className="flex flex-col items-center justify-center h-64 space-y-3">
+          <Spinner size="lg" variant="red" />
+          <p className="text-xs text-[#888888]">Loading SQLite merge queues…</p>
+        </div>
+      ) : (
+        <>
+
       {/* Active Merge in Progress Notification Banner */}
       {isMerging && (
-        <div className="p-3.5 rounded-xl border border-amber-800/40 bg-amber-950/20 text-amber-300 text-xs flex items-center gap-2.5">
-          <Clock className="w-4 h-4 text-amber-400 shrink-0 animate-pulse" />
-          <span>
+        <div className="p-3.5 rounded-xl border border-brand-red/40 bg-theme-base text-xs flex items-center gap-2.5">
+          <Clock className="w-4 h-4 text-brand-red shrink-0 animate-pulse" />
+          <span className="text-white font-medium">
             A playlist is currently downloading and merging. Start Merge is temporarily disabled until the active download completes.
           </span>
         </div>
@@ -217,6 +239,8 @@ export function QueuesView({ onStartMergeUrl, isMerging = false, activeUrl }: Qu
             );
           })}
         </div>
+      )}
+      </>
       )}
     </div>
   );

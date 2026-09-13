@@ -6,6 +6,7 @@ export interface ToastData {
   id?: string;
   message: string;
   type?: 'error' | 'success' | 'info';
+  title?: string;
   duration?: number;
 }
 
@@ -17,7 +18,7 @@ interface ToastProps {
 export function Toast({ toast, onDismiss }: ToastProps) {
   useEffect(() => {
     if (!toast) return;
-    const duration = toast.duration ?? 5000;
+    const duration = toast.duration ?? (toast.type === 'error' ? 7500 : 5000);
     const timer = setTimeout(onDismiss, duration);
     return () => clearTimeout(timer);
   }, [toast, onDismiss]);
@@ -66,7 +67,7 @@ export function Toast({ toast, onDismiss }: ToastProps) {
 
         <div className="flex-1 min-w-0 pr-1">
           <p className="text-xs font-semibold text-content-primary leading-none">
-            {config.title}
+            {toast.title || config.title}
           </p>
           <p className="text-xs text-content-secondary mt-1 leading-relaxed break-words">
             {toast.message}
