@@ -251,8 +251,8 @@ if sys.platform == "darwin":
             "CFBundleName": "TubeMerge",
             "CFBundleDisplayName": "TubeMerge",
             "CFBundleIdentifier": "com.tubemerger.desktop",
-            "CFBundleVersion": "1.0.9",
-            "CFBundleShortVersionString": "1.0.9",
+            "CFBundleVersion": "1.1.0",
+            "CFBundleShortVersionString": "1.1.0",
 
             "NSDownloadsFolderUsageDescription": "TubeMerger needs access to save downloaded videos to your Downloads folder.",
             "NSDesktopFolderUsageDescription": "TubeMerger needs access to save downloaded videos to your Desktop.",

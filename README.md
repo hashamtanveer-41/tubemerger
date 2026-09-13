@@ -14,12 +14,12 @@
   <img src="https://img.shields.io/badge/React-19.0-61DAFB?style=flat-square&logo=react&logoColor=black" alt="React 19" />
   <img src="https://img.shields.io/badge/TypeScript-5.7-3178C6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript" />
   <img src="https://img.shields.io/badge/Tailwind-4.0-38B2AC?style=flat-square&logo=tailwindcss&logoColor=white" alt="Tailwind CSS" />
-  <img src="https://img.shields.io/badge/version-1.0.9-brightgreen?style=flat-square" alt="Version 1.0.9" />
+  <img src="https://img.shields.io/badge/version-1.1.0-brightgreen?style=flat-square" alt="Version 1.1.0" />
 </p>
 
-**[TubeMerger](https://tubemerger.com)** is a 100% free, open-source desktop application for Windows, macOS, and Linux that lets you **[download YouTube playlists](https://tubemerger.com/download)** and **[merge full playlists into a single seamless video](https://tubemerger.com/playlist-to-single-video)** with automatic chapter markers. Powered by `yt-dlp` and `FFmpeg` running entirely on your local machine, TubeMerger is an ad-free video downloader with no cloud queues, no account registrations, and no artificial duration caps.
+**[TubeMerger](https://tubemerger.com)** is a 100% free, open-source desktop application for Windows, macOS, and Linux that lets you **[download YouTube playlists](https://tubemerger.com/download)**, **[merge full playlists into a single seamless video](https://tubemerger.com/playlist-to-single-video)** with automatic chapter markers, **download 4K Ultra HD single videos & Shorts**, and **extract or stitch 320kbps MP3 audio albums**. Powered by `yt-dlp` and `FFmpeg` running entirely on your local machine, TubeMerger is an ad-free media workstation with no cloud queues, no account registrations, and no artificial duration caps.
 
-What makes TubeMerger different from every other YouTube playlist downloader is its granular per-video control. Unlike bulk download tools that blindly grab everything, TubeMerger shows you every video in the playlist before downloading — letting you skip or exclude specific clips with a single click. You also get real-time metrics while the merge runs: live download speed, total playlist duration, and an estimated output file size, so you always know exactly what is happening on your machine.
+What makes TubeMerger different from bulk download tools is its granular control and rich desktop capabilities. You get an interactive playlist inspector to cherry-pick or skip clips with one click, dynamic bitrate-aware file size recalculation, native process-level pause/resume, sequential background queuing to prevent bandwidth choking, and instant diagnostics for commercial streaming links (like Spotify and Apple Music).
 
 ---
 
@@ -38,32 +38,44 @@ See TubeMerger in action — pasting a playlist, skipping unwanted clips, choosi
 
 ## Core Features
 
-### 🎬 Stitched or Separate Downloads
-Choose exactly how your output is structured. **Stitched mode** concatenates all selected videos into one seamless master MP4 with chapter markers at each clip boundary — perfect for archiving an entire course, lecture series, or tutorial playlist. **Separate Downloads mode** saves each chosen clip as its own individual file in a dedicated folder, giving you full flexibility without any manual splitting afterwards.
+### 🎬 Stitched or Separate Playlist Downloads
+Choose exactly how your output is structured:
+- **Stitched Mode**: Concatenates all selected videos into one continuous master video (`.mp4` or `.mkv`) with embedded chapter markers at each clip boundary — perfect for archiving an entire course, lecture series, tutorial, or documentary.
+- **Separate Mode**: Downloads each chosen clip as its own individual file in a clean subfolder, giving you full flexibility without any manual splitting afterwards.
+
+### 📥 4K Ultra HD Video & Shorts Downloader
+Download individual YouTube videos and Shorts in up to **4K Ultra HD (2160p)**, **1440p (2K)**, **1080p (Full HD)**, **720p**, **480p**, and **360p**. Includes real-time video thumbnail preview, channel attribution, duration, and instant quality selection.
+
+### 🎵 Audio Studio (320kbps MP3 Extraction & Album Stitching)
+Dedicated audio workspace supporting single audio extraction and multi-track playlist merging:
+- **Bitrate Presets**: Choose between **320 kbps (Extreme HQ / Audiophile)**, **256 kbps (High Quality)**, **192 kbps (Standard)**, or **128 kbps (Compact)**.
+- **Continuous MP3 Albums**: Merge an entire music playlist into a continuous audio album or audiobook.
+- **Dynamic File Size Calculation**: Pre-calculates expected download and output file sizes instantly as you switch bitrates.
+
+### ⏸️ Process-Level Instant Pause & Resume
+Freeze long-running downloads or FFmpeg stitches at any time. Powered by OS-level process tree signals (`SIGSTOP`/`SIGCONT` on Linux/macOS and thread suspension on Windows via `psutil`), pausing halts all CPU and disk activity immediately without losing downloaded chunks or restarting jobs from scratch.
+
+### 📋 Sequential Queue Manager
+Batch-process multiple playlists and videos without congesting your home network. TubeMerger's queue worker processes jobs sequentially one-by-one, preventing ISP bandwidth throttling, packet loss, and YouTube 429 rate-limiting.
 
 ### ✂️ Granular Playlist Control
-Never download a video you don't want. TubeMerger's playlist inspector shows you every video's title, thumbnail, and duration before a single byte is downloaded. Toggle individual clips on or off with one click. Reorder your selection, skip irrelevant episodes, or cherry-pick just the clips you need — the merge pipeline only touches what you've selected.
+Never download a video you don't want. The playlist inspector displays each video's title, thumbnail, and duration before any download begins. Toggle individual clips on or off with one click, select all, deselect all, and preview the resulting stitched runtime.
 
-### 📺 Multi-Quality Selection
-Download in the resolution that fits your needs. TubeMerger supports **360p, 480p, 720p HD, 1080p Full HD, and 4K Ultra HD** output targets. The normalization engine automatically re-encodes all clips to the chosen canvas using libx264 (CRF 21), eliminating black bars, aspect-ratio jumps, and resolution mismatches between clips from different playlist entries.
-
-### 📊 Real-Time Metrics Dashboard
-Never be left guessing. The live progress panel shows you:
-- **Download speed** — updated in real time via Server-Sent Events (SSE)
-- **Total playlist duration** — calculated from all selected clip metadata before download starts
-- **Estimated output file size** — computed from bitrate and duration so you know the final size before the merge completes
-- **Per-clip encoding status** — watch each video move through download → normalize → stitch
+### 🧭 Interactive Tour Guide & Smart Diagnostics
+- **Spotlight Tour**: Interactive, step-by-step onboarding walkthrough that highlights key interface elements for first-time users.
+- **Platform Error Diagnostics**: Intelligent detection and guidance for multi-URL pastes, commercial streaming links (Spotify, Apple Music, Tidal), private/unlisted restrictions, and age-gated videos.
 
 ---
 
 ## Additional Capabilities
 
-- **Automated Chapter Demuxing** — Embeds seekable MP4 chapter markers from each video's title. Works natively in VLC, QuickTime, Windows Media Player, and any standard player.
-- **Smart Audio Normalization** — Re-encodes all audio tracks to uniform 44.1 kHz AAC stereo so there are no volume spikes or level drops across merged clips.
-- **100% Local & Private Processing** — yt-dlp and FFmpeg run directly on your machine. No video streams, playlist URLs, or titles are ever uploaded to cloud servers.
-- **Merge Job Queue & History** — Queue multiple playlists, cancel in-progress jobs, and review past merges from a local SQLite WAL history log.
-- **Auto Binary Management** — FFmpeg and yt-dlp are auto-detected from PATH or downloaded automatically to `~/.tubemerger/bin/` on first launch. No manual setup.
-- **Completely Free & Unlimited** — Zero paywalls, no device limits, no subscription tiers, and no license keys. MIT licensed.
+- **Automated Chapter Demuxing** — Embeds seekable MP4 chapter markers from each video's title. Works natively in VLC, QuickTime, Windows Media Player, and modern media players.
+- **Smart Audio Normalization** — Re-encodes audio tracks to uniform 44.1 kHz AAC or MP3 stereo to eliminate volume spikes across merged clips.
+- **100% Local & Private Processing** — `yt-dlp` and `FFmpeg` execute directly on your hardware. No videos, URLs, or personal data ever pass through remote cloud servers.
+- **Persistent SQLite History** — Review past merges, open output folders, or replay completed videos directly from the local SQLite WAL history log.
+- **Auto Binary Management** — Automatically detects or provisions portable `FFmpeg` and `yt-dlp` binaries to `~/.tubemerger/bin/` on first launch.
+- **Modern SEO & Web App Metadata** — Complete Open Graph, Twitter Cards, dynamic document titles, and JSON-LD `SoftwareApplication` structured schema.
+- **Completely Free & Open Source** — Zero paywalls, no device caps, no subscriptions, and no license keys. MIT licensed.
 
 ---
 
@@ -89,7 +101,7 @@ sequenceDiagram
     API->>DB: Record new merge job in local history
     API->>YTDLP: Download selected raw video streams to temp workspace
     loop For each downloaded clip
-        API->>FFMPEG: Re-encode to chosen resolution (360p–4K) + AAC stereo
+        API->>FFMPEG: Re-encode to chosen resolution (360p–4K) or MP3 (320k)
         FFMPEG-->>API: Stream encoding progress (SSE) → real-time speed & file size
         API-->>User: Live dashboard: speed, duration, estimated output size
     end
@@ -97,7 +109,7 @@ sequenceDiagram
     Note over API,User: Step 3: Stitch or Separate + Chapter Embedding
     API->>FFMPEG: Concat demuxer (stitched mode) OR copy to output folder (separate mode)
     API->>FFMPEG: Embed MP4 chapter markers from clip titles
-    FFMPEG-->>API: Final unified .mp4 or individual files created
+    FFMPEG-->>API: Final unified .mp4, .mkv, or .mp3 created
     API->>DB: Mark merge job as completed
     API-->>User: Complete! Reveal file in OS file manager
 ```
@@ -116,17 +128,21 @@ tubemerger/
 ├── frontend/                                    # Modern React 19 + TypeScript + Vite SPA
 │   ├── src/
 │   │   ├── components/
-│   │   │   ├── ui/                              # Primitive components (Button, Badge, Spinner)
+│   │   │   ├── ui/                              # Primitive components (Button, Badge, Spinner, Toast)
 │   │   │   ├── layout/                          # Header, Sidebar, Navigation
-│   │   │   └── merge/                           # Action panels, ProgressSpotlight, FloatingActionBar
+│   │   │   ├── playlist/                        # PlaylistCard, VideoTable clip cherry-picker
+│   │   │   ├── merge/                           # Action panels, ProgressSpotlight, FloatingActionBar
+│   │   │   └── tour/                            # SpotlightTour interactive onboarding guide
 │   │   ├── views/
-│   │   │   ├── EmptyStateView.tsx               # 3x2 Feature showcase grid & GitHub Star CTA
+│   │   │   ├── HomeView.tsx                     # Universal search & feature launchpad
 │   │   │   ├── DiscoveryView.tsx                # Playlist clip inspector & granular selector
-│   │   │   ├── HistoryView.tsx                  # Local SQLite merge history log
-│   │   │   └── QueuesView.tsx                   # Background merge queue view
+│   │   │   ├── SingleVideoView.tsx              # 4K Ultra HD video & Shorts downloader
+│   │   │   ├── AudioView.tsx                    # Audio Studio (320kbps MP3 extraction & albums)
+│   │   │   ├── QueuesView.tsx                   # Sequential multi-playlist background queue
+│   │   │   └── HistoryView.tsx                  # Local SQLite merge history log
 │   │   ├── hooks/useMergeApp.ts                 # Unified application state manager
 │   │   └── services/api.ts                      # Strongly typed REST client & SSE subscriber
-│   └── dist/                                    # Pre-compiled production bundle
+│   └── dist/                                    # Pre-compiled production bundle with SEO schema
 ├── src/
 │   └── tubemerge/                               # Python Backend (Modular Apps)
 │       ├── core/
@@ -136,16 +152,16 @@ tubemerger/
 │       │   └── connection.py                    # SQLite WAL connection manager & auto-migrations
 │       ├── apps/
 │       │   ├── binaries/                        # FFmpeg & yt-dlp locator & auto-installer
-│       │   ├── playlists/                       # YouTube metadata & master canvas probing
+│       │   ├── playlists/                       # YouTube metadata, URL sanitizing & DRM diagnostics
 │       │   ├── merger/                          # FFmpeg normalizer, concat stitcher, MergeEngine
 │       │   │   ├── services/
 │       │   │   │   ├── engine.py                # Download → normalise → stitch pipeline
-│       │   │   │   ├── normalizer.py            # FFmpeg per-clip re-encode (libx264 + AAC)
+│       │   │   │   ├── normalizer.py            # FFmpeg per-clip re-encode (libx264 + AAC/MP3)
 │       │   │   │   └── stitcher.py              # FFmpeg concat + chapter metadata embed
 │       │   │   ├── controllers/merge_controller.py
-│       │   │   └── routes.py                    # /api/start-merge, /api/progress (SSE), /api/cancel
+│       │   │   └── routes.py                    # /api/start-merge, /api/progress, /api/pause, /api/resume
 │       │   ├── history/                         # Local merge job history management
-│       │   ├── queues/                          # Merge job queue handling
+│       │   ├── queues/                          # Sequential merge job queue handling
 │       │   ├── updates/                         # Startup update check & forced update enforcement
 │       │   ├── system/                          # Native OS file integration (xdg-open / explorer)
 │       │   └── telemetry/                       # Aptabase anonymous counter service
@@ -158,7 +174,7 @@ tubemerger/
 │   └── package.json                             # Website build dependencies
 ├── scripts/
 │   └── bump_version.py                          # Atomic version bump across all project files
-├── tests/                                       # OOP unit and integration test suite
+├── tests/                                       # OOP unit and integration test suite (35 tests)
 ├── main.py                                      # Primary application entrypoint
 ├── pyproject.toml                               # PEP 621 packaging metadata
 └── requirements.txt                             # Python dependencies
