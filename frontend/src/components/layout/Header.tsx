@@ -4,6 +4,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
 import { api } from '@/services/api';
 import { SUPPORT_URL } from '@/components/common/SupportModal';
+import logoPng from '@/assets/logo.png';
 
 const GITHUB_URL = 'https://github.com/hashamtanveer-41/tubemerger';
 
@@ -60,9 +61,9 @@ export function Header({
       {/* Brand */}
       <div className="flex items-center space-x-3 w-64 shrink-0">
         <img
-          src="/assets/logo.png"
+          src={logoPng}
           alt="TubeMerger"
-          className="w-9 h-9 rounded-full object-cover border border-stroke-light shrink-0"
+          className="w-8 h-8 object-contain shrink-0"
           onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
         />
         <div>

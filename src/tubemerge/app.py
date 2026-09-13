@@ -111,6 +111,17 @@ def _launch_desktop_window() -> None:
     if has_display:
         # 1. Primary: Native PyWebView GTK / Cocoa WebKit / WinForms / WebView2 desktop frame
         try:
+            if sys.platform.startswith("linux"):
+                try:
+                    import gi
+                    gi.require_version("Gtk", "3.0")
+                    from gi.repository import Gtk
+                    icon_file = str(settings.PROJECT_ROOT / "assets" / "logo.png")
+                    if os.path.exists(icon_file):
+                        Gtk.Window.set_default_icon_from_file(icon_file)
+                except Exception:
+                    pass
+
             import webview
             window = webview.create_window(
                 title=f"{settings.APP_NAME} – {settings.APP_TAGLINE}",

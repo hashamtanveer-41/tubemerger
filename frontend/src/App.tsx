@@ -21,6 +21,7 @@ import { ForceUpdateModal } from '@/components/updates/ForceUpdateModal';
 import { UpdateBanner } from '@/components/updates/UpdateBanner';
 import { api, checkForUpdates, UpdateCheckResult } from '@/services/api';
 import { UpdateInfo } from '@/types';
+import logoPng from '@/assets/logo.png';
 
 // ---------------------------------------------------------------------------
 // Startup check state machine
@@ -215,9 +216,9 @@ export function App() {
     return (
       <div className="fixed inset-0 bg-[#0A0A0A] flex flex-col items-center justify-center gap-4">
         <img
-          src="/assets/logo.png"
+          src={logoPng}
           alt="TubeMerger"
-          className="w-12 h-12 rounded-full object-cover opacity-70"
+          className="w-12 h-12 object-contain opacity-90"
           onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
         />
         <Spinner size="sm" variant="red" />
