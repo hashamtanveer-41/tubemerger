@@ -37,3 +37,14 @@ def open_url(payload: UrlPayload):
         raise HTTPException(status_code=400, detail="URL could not be opened.")
     return {"status": "ok", "message": "Opened URL successfully."}
 
+@router.get("/settings")
+def get_settings():
+    """Retrieve persistent desktop user settings and tour state."""
+    return system_service.get_settings()
+
+@router.post("/settings")
+def update_settings(payload: dict):
+    """Save persistent desktop user settings and tour state."""
+    return system_service.update_settings(payload)
+
+

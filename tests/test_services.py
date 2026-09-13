@@ -183,6 +183,26 @@ class TestErrorDiagnostics(unittest.TestCase):
         self.assertNotIn("caused by", diag.message)
 
 
+class TestSystemSettings(unittest.TestCase):
+    def test_settings_persistence(self):
+        import tempfile
+        from tubemerge.apps.system.services import SystemService
+        with tempfile.TemporaryDirectory() as tmpdir:
+            test_file = Path(tmpdir) / "settings.json"
+            with patch("tubemerge.core.settings.SETTINGS_FILE", test_file):
+                # Initial default
+                init = SystemService.get_settings()
+                self.assertFalse(init.get("tour_completed", False))
+
+                # Update setting
+                updated = SystemService.update_settings({"tour_completed": True})
+                self.assertTrue(updated.get("tour_completed"))
+
+                # Read again
+                read_back = SystemService.get_settings()
+                self.assertTrue(read_back.get("tour_completed"))
+
+
 if __name__ == "__main__":
     unittest.main()
 

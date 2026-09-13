@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Sparkles, ArrowRight, ArrowLeft, X, Check } from 'lucide-react';
+import { api } from '@/services/api';
 
 export interface TourStep {
   targetId: string;
@@ -188,6 +189,7 @@ export function SpotlightTour({ isOpen, onClose, onNavigate, activeTab }: Spotli
     try {
       localStorage.setItem('tubemerger_tour_v1', 'true');
       localStorage.setItem('tubemerger_tour_completed', 'true');
+      api.saveSettings({ tour_completed: true });
     } catch {
       // Storage access unavailable
     }

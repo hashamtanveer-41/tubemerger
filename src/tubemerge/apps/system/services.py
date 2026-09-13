@@ -1,9 +1,11 @@
 """System Service - Interacts with host OS desktop environment."""
 
 import os
+import json
 import platform
 import subprocess
 from pathlib import Path
+from tubemerge.core import settings
 
 class SystemService:
     """Invokes native file managers and media players across OS platforms."""
@@ -130,4 +132,33 @@ class SystemService:
             return webbrowser.open(cleaned)
         except Exception:
             return False
+
+    @classmethod
+    def get_settings(cls) -> dict:
+        """Retrieve persistent user settings from ~/.tubemerger/settings.json."""
+        if not settings.SETTINGS_FILE.exists():
+            return {"tour_completed": False}
+        try:
+            content = settings.SETTINGS_FILE.read_text(encoding="utf-8").strip()
+            if content:
+                data = json.loads(content)
+                if isinstance(data, dict):
+                    return data
+        except Exception:
+            pass
+        return {"tour_completed": False}
+
+    @classmethod
+    def update_settings(cls, updates: dict) -> dict:
+        """Update persistent settings in ~/.tubemerger/settings.json."""
+        current = cls.get_settings()
+        if isinstance(updates, dict):
+            current.update(updates)
+        try:
+            settings.SETTINGS_FILE.parent.mkdir(parents=True, exist_ok=True)
+            settings.SETTINGS_FILE.write_text(json.dumps(current, indent=2), encoding="utf-8")
+        except Exception:
+            pass
+        return current
+
 

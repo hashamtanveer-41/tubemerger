@@ -120,7 +120,12 @@ def _launch_desktop_window() -> None:
                 min_size=(960, 640),
                 background_color="#0F0F0F",
             )
-            webview.start()
+            storage_dir = str(settings.APP_DATA_DIR / "webview_data")
+            os.makedirs(storage_dir, exist_ok=True)
+            try:
+                webview.start(storage_path=storage_dir, private_mode=False)
+            except TypeError:
+                webview.start()
             # If native window was closed by the user, terminate application cleanly
             sys.exit(0)
         except Exception as exc:

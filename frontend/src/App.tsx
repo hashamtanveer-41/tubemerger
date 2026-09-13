@@ -19,7 +19,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { NoInternetModal } from '@/components/updates/NoInternetModal';
 import { ForceUpdateModal } from '@/components/updates/ForceUpdateModal';
 import { UpdateBanner } from '@/components/updates/UpdateBanner';
-import { checkForUpdates, UpdateCheckResult } from '@/services/api';
+import { api, checkForUpdates, UpdateCheckResult } from '@/services/api';
 import { UpdateInfo } from '@/types';
 
 // ---------------------------------------------------------------------------
@@ -88,19 +88,47 @@ export function App() {
     runChecks();
   }, [runChecks]);
 
-  // Trigger the tour guide whenever the app starts for the first ever time
+  // Trigger the tour guide ONLY once on the very first installation/launch, and later by choice
   useEffect(() => {
     if (startupState !== 'ready') return;
 
-    try {
-      const tourCompleted = localStorage.getItem('tubemerger_tour_v1');
-      if (tourCompleted !== 'true') {
-        const timer = setTimeout(() => setIsTourOpen(true), 600);
-        return () => clearTimeout(timer);
+    let cancelled = false;
+
+    const checkAndTriggerTour = async () => {
+      try {
+        const localSeen =
+          localStorage.getItem('tubemerger_tour_v1') === 'true' ||
+          localStorage.getItem('tubemerger_tour_completed') === 'true';
+
+        if (localSeen) return;
+
+        // Check persistent settings on backend disk
+        const remoteSettings = await api.getSettings();
+        if (remoteSettings?.tour_completed) {
+          localStorage.setItem('tubemerger_tour_v1', 'true');
+          return;
+        }
+
+        if (cancelled) return;
+
+        // Genuinely the first ever launch:
+        // Immediately record completion to prevent repeated automatic triggers across launches/restarts
+        localStorage.setItem('tubemerger_tour_v1', 'true');
+        localStorage.setItem('tubemerger_tour_completed', 'true');
+        api.saveSettings({ tour_completed: true });
+
+        // Show the initial onboarding tour once
+        setIsTourOpen(true);
+      } catch {
+        // Storage access blocked or network unavailable
       }
-    } catch {
-      // Storage access blocked
-    }
+    };
+
+    const timer = setTimeout(checkAndTriggerTour, 600);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
   }, [startupState]);
 
   // Callback for the NoInternetModal "Try Again" button

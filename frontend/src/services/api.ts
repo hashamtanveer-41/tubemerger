@@ -547,6 +547,28 @@ export class ApiClient {
       eventSource.close();
     };
   }
+
+  async getSettings(): Promise<{ tour_completed?: boolean }> {
+    try {
+      const res = await fetch(`${this.baseUrl}/api/settings`);
+      if (!res.ok) throw new Error('Failed to get settings');
+      return await res.json();
+    } catch {
+      return { tour_completed: false };
+    }
+  }
+
+  async saveSettings(settings: Record<string, any>): Promise<void> {
+    try {
+      await fetch(`${this.baseUrl}/api/settings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(settings),
+      });
+    } catch {
+      // Best effort
+    }
+  }
 }
 
 export const api = new ApiClient();
