@@ -118,3 +118,16 @@ class SystemService:
             return True
         except Exception:
             return False
+
+    @classmethod
+    def open_url(cls, url: str) -> bool:
+        """Open web URL in host system's default browser."""
+        cleaned = (url or "").strip()
+        if not cleaned.startswith(("http://", "https://")):
+            return False
+        import webbrowser
+        try:
+            return webbrowser.open(cleaned)
+        except Exception:
+            return False
+

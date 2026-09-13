@@ -16,6 +16,7 @@ import {
   Layers,
   ExternalLink,
 } from 'lucide-react';
+import { SupportCard } from '@/components/common/SupportCard';
 
 interface HistoryViewProps {
   onReMerge: (url: string) => void;
@@ -316,6 +317,10 @@ export function HistoryView({ onReMerge, onNavigateToMerge }: HistoryViewProps) 
             </div>
           ))}
         </div>
+      )}
+
+      {history.length > 0 && (
+        <SupportCard variant="compact" dismissible className="mt-6" />
       )}
     </div>
   );

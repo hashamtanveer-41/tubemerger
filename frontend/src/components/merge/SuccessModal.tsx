@@ -2,14 +2,15 @@ import React, { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { api } from '@/services/api';
-import { CheckCircle2, Play, FolderOpen, FolderCheck } from 'lucide-react';
+import { CheckCircle2, Play, FolderOpen, FolderCheck, Coffee } from 'lucide-react';
 
 interface SuccessModalProps {
   outputFile: string;
   onReset: () => void;
+  onOpenSupport?: () => void;
 }
 
-export function SuccessModal({ outputFile, onReset }: SuccessModalProps) {
+export function SuccessModal({ outputFile, onReset, onOpenSupport }: SuccessModalProps) {
   const [openingFile, setOpeningFile] = useState(false);
   const [openingFolder, setOpeningFolder] = useState(false);
 
@@ -94,12 +95,26 @@ export function SuccessModal({ outputFile, onReset }: SuccessModalProps) {
         </Button>
       </div>
 
-      <button
-        onClick={onReset}
-        className="text-xs text-content-dim hover:text-content-primary underline cursor-pointer transition-colors"
-      >
-        {isFolder ? 'Download Another Playlist' : 'Start New Merge'}
-      </button>
+      {/* Navigation and Support Actions */}
+      <div className="flex flex-col items-center gap-2 pt-2">
+        <button
+          onClick={onReset}
+          className="text-xs text-content-dim hover:text-content-primary underline cursor-pointer transition-colors"
+        >
+          {isFolder ? 'Download Another Playlist' : 'Start New Merge'}
+        </button>
+
+        {onOpenSupport && (
+          <button
+            type="button"
+            onClick={onOpenSupport}
+            className="text-[11px] text-[#666666] hover:text-[#AAAAAA] flex items-center gap-1.5 transition-colors cursor-pointer mt-1"
+          >
+            <Coffee className="w-3 h-3 text-brand-red/80" />
+            <span>Support the Developer</span>
+          </button>
+        )}
+      </div>
     </Card>
   );
 }

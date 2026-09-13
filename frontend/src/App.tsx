@@ -13,6 +13,7 @@ import { ProgressSpotlight } from '@/components/merge/ProgressSpotlight';
 import { SuccessModal } from '@/components/merge/SuccessModal';
 import { FloatingActionBar } from '@/components/merge/FloatingActionBar';
 import { SpotlightTour } from '@/components/tour/SpotlightTour';
+import { SupportModal } from '@/components/common/SupportModal';
 import { Toast } from '@/components/ui/toast';
 import { Spinner } from '@/components/ui/spinner';
 import { NoInternetModal } from '@/components/updates/NoInternetModal';
@@ -36,6 +37,7 @@ export function App() {
   const [startupState, setStartupState] = useState<StartupState>('checking');
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
   const [isTourOpen, setIsTourOpen] = useState(false);
+  const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
 
   // ── Run startup checks ─────────────────────────────────────────────────
   const runChecks = useCallback(async (): Promise<boolean> => {
@@ -169,6 +171,16 @@ export function App() {
     const twitterDescTag = document.querySelector('meta[name="twitter:description"]');
     if (twitterDescTag) twitterDescTag.setAttribute('content', metaDesc);
   }, [app.activeTab, app.playlist?.title]);
+
+  // ── Automatically open Support Modal once a merge/download finishes ──
+  useEffect(() => {
+    if (!app.isMerging && app.outputFile) {
+      const timer = setTimeout(() => {
+        setIsSupportModalOpen(true);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [app.isMerging, app.outputFile]);
 
   // ── Startup screens ────────────────────────────────────────────────────
   if (startupState === 'checking') {
@@ -343,7 +355,11 @@ export function App() {
                   )}
 
                   {!app.isMerging && app.outputFile && (
-                    <SuccessModal outputFile={app.outputFile} onReset={app.reset} />
+                    <SuccessModal
+                      outputFile={app.outputFile}
+                      onReset={app.reset}
+                      onOpenSupport={() => setIsSupportModalOpen(true)}
+                    />
                   )}
 
                   {!app.isMerging && !app.outputFile && app.playlist && (
@@ -392,6 +408,12 @@ export function App() {
         onClose={() => setIsTourOpen(false)}
         onNavigate={app.setActiveTab}
         activeTab={app.activeTab}
+      />
+
+      {/* Voluntary Developer Tipping Modal */}
+      <SupportModal
+        isOpen={isSupportModalOpen}
+        onClose={() => setIsSupportModalOpen(false)}
       />
     </div>
   );

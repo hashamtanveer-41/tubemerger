@@ -215,6 +215,18 @@ export class ApiClient {
     if (!res.ok) throw new Error('Could not open folder in system file manager');
   }
 
+  async openUrl(url: string): Promise<void> {
+    try {
+      await fetch(`${this.baseUrl}/api/open-url`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+      });
+    } catch {
+      window.open(url, '_blank', 'noopener,noreferrer');
+    }
+  }
+
   async getLicenseStatus(): Promise<LicenseInfo> {
     const res = await fetch(`${this.baseUrl}/api/license/status`, {
       headers: this.getAuthHeaders(),

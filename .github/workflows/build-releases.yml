@@ -23,9 +23,6 @@ jobs:
           - os: macos-latest
             platform: macos-arm64
             artifact_name: TubeMerge-macOS-arm64.zip
-          - os: macos-13
-            platform: macos-x64
-            artifact_name: TubeMerge-macOS-x64.zip
           - os: ubuntu-22.04
             platform: linux
             artifact_name: TubeMerge-Linux-x64.tar.gz
@@ -124,9 +121,8 @@ jobs:
           xattr -cr dist/TubeMerge.app || true
           cd dist
           zip -r ${{ matrix.artifact_name }} TubeMerge.app
-          if [ "$arch" = "arm64" ]; then
-            cp ${{ matrix.artifact_name }} TubeMerge-macOS.zip
-          fi
+          cp ${{ matrix.artifact_name }} TubeMerge-macOS.zip
+          cp ${{ matrix.artifact_name }} TubeMerge-macOS-x64.zip
 
 
       - name: Package Linux (.tar.gz)

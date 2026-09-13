@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Github } from 'lucide-react';
+import { Search, Github, Heart } from 'lucide-react';
 import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
+import { api } from '@/services/api';
+import { SUPPORT_URL } from '@/components/common/SupportModal';
 
 const GITHUB_URL = 'https://github.com/hashamtanveer-41/tubemerger';
 
@@ -12,7 +14,12 @@ interface HeaderProps {
   onSearchQueryChange?: (query: string) => void;
 }
 
-export function Header({ onSearch, loading, searchQuery = '', onSearchQueryChange }: HeaderProps) {
+export function Header({
+  onSearch,
+  loading,
+  searchQuery = '',
+  onSearchQueryChange,
+}: HeaderProps) {
   const [url, setUrl] = useState(searchQuery);
 
   useEffect(() => {
@@ -103,15 +110,27 @@ export function Header({ onSearch, loading, searchQuery = '', onSearchQueryChang
         </div>
       </form>
 
-      {/* GitHub Star button — replaces auth/sign-in */}
-      <div className="flex items-center justify-end w-64 shrink-0">
+      {/* Utility Actions: Support Developer & GitHub Star */}
+      <div className="flex items-center justify-end w-72 shrink-0 gap-2.5">
+        <button
+          type="button"
+          onClick={() => {
+            api.openUrl(SUPPORT_URL).catch(() => window.open(SUPPORT_URL, '_blank', 'noopener,noreferrer'));
+          }}
+          className="flex items-center gap-1.5 h-9 px-3 rounded-full bg-[#1A1A1A] hover:bg-[#252525] border border-[#333333] hover:border-pink-500/40 text-xs font-semibold text-[#CCCCCC] hover:text-white transition-all group active:border-brand-red cursor-pointer"
+          title="Support the Developer"
+        >
+          <Heart className="w-3.5 h-3.5 text-pink-500 fill-pink-500/20 group-hover:fill-pink-500 transition-all" />
+          <span>Support</span>
+        </button>
+
         <a
           href={GITHUB_URL}
           target="_blank"
           rel="noopener noreferrer"
           onClick={() => setGithubClicked(true)}
           className={cn(
-            "flex items-center gap-2 h-9 px-4 rounded-full bg-[#1A1A1A] hover:bg-[#252525] border border-[#333333] hover:border-[#555555] text-xs font-semibold transition-all group active:border-brand-red cursor-pointer",
+            "flex items-center gap-2 h-9 px-3.5 rounded-full bg-[#1A1A1A] hover:bg-[#252525] border border-[#333333] hover:border-[#555555] text-xs font-semibold transition-all group active:border-brand-red cursor-pointer",
             githubClicked ? "text-white border-brand-red/50" : "text-[#AAAAAA] hover:text-white"
           )}
         >

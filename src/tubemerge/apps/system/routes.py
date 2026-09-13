@@ -25,3 +25,15 @@ def open_folder(payload: PathPayload):
     if not ok:
         raise HTTPException(status_code=404, detail="Folder could not be opened or does not exist.")
     return {"status": "ok", "message": "Opened folder successfully."}
+
+class UrlPayload(BaseModel):
+    url: str
+
+@router.post("/open-url")
+def open_url(payload: UrlPayload):
+    """Launch external URL in default desktop browser."""
+    ok = system_service.open_url(payload.url)
+    if not ok:
+        raise HTTPException(status_code=400, detail="URL could not be opened.")
+    return {"status": "ok", "message": "Opened URL successfully."}
+
