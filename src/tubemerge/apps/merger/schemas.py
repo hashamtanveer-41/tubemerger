@@ -13,6 +13,7 @@ class StartMergeRequest(BaseModel):
     quality: Optional[str] = None
     crf: Optional[int] = 21
     merge_videos: Optional[bool] = True
+    format: Optional[str] = "mp4"
 
 
 class StartMergeResponse(BaseModel):
@@ -24,5 +25,15 @@ class StartMergeResponse(BaseModel):
 
 
 class CancelResponse(BaseModel):
+    status: str
+    message: str
+
+
+class PauseResponse(BaseModel):
+    status: str
+    message: str
+
+
+class ResumeResponse(BaseModel):
     status: str
     message: str

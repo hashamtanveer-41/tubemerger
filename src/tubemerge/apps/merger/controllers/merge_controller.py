@@ -17,7 +17,13 @@ from fastapi.responses import StreamingResponse
 from tubemerge.apps.binaries.services import BinaryService
 from tubemerge.apps.playlists.services import PlaylistMetadataService
 from tubemerge.apps.merger.models import ProgressSnapshot, PipelineStatus
-from tubemerge.apps.merger.schemas import StartMergeRequest, StartMergeResponse, CancelResponse
+from tubemerge.apps.merger.schemas import (
+    StartMergeRequest,
+    StartMergeResponse,
+    CancelResponse,
+    PauseResponse,
+    ResumeResponse,
+)
 from tubemerge.apps.merger.services.engine import MergeEngine, MergeJobSpec
 from tubemerge.apps.telemetry.service import TelemetryService
 
@@ -34,7 +40,7 @@ class MergeController:
         authorization: Optional[str] = None,
         session_id: Optional[str] = None,
     ) -> StartMergeResponse:
-        """Kick off a merge job. No license or quota gate — fully unlimited."""
+        """Start a merge job without license, quota, or hardware restrictions."""
         if self.active_engine and getattr(self.active_engine, "is_running", False):
             raise HTTPException(
                 status_code=409,
@@ -53,14 +59,17 @@ class MergeController:
 
         selected_quality = payload.quality or (payload.canvas_preset if payload.canvas_preset != "auto" else "1080p")
         canvas = payload.canvas_preset or "auto"
+        media_fmt = (payload.format or "mp4").lower().strip()
+        default_ext = ".mp3" if media_fmt == "mp3" else ".mp4"
         job_spec = MergeJobSpec(
             playlist_url=payload.url,
             selected_indices=payload.selected_indices,
-            output_filename=payload.output_filename or f"TubeMerge_{job_id}.mp4",
+            output_filename=payload.output_filename or f"TubeMerge_{job_id}{default_ext}",
             canvas_preset=canvas,
             quality=selected_quality,
             crf=payload.crf or 21,
             merge_videos=payload.merge_videos if payload.merge_videos is not None else True,
+            media_format=media_fmt,
         )
 
         # Build metadata service (needs ytdlp path)
@@ -105,6 +114,13 @@ class MergeController:
         """SSE endpoint — emits ProgressSnapshot JSON until terminal state."""
         q: asyncio.Queue = asyncio.Queue()
         self.progress_queues.append(q)
+
+        # Immediately dispatch current snapshot to the new subscriber so UI receives state instantly
+        if self.active_engine and getattr(self.active_engine, "_last_snapshot", None):
+            try:
+                q.put_nowait(self.active_engine._last_snapshot)
+            except Exception:
+                pass
 
         async def event_generator():
             try:
@@ -151,3 +167,22 @@ class MergeController:
             TelemetryService.track_job_cancelled()
             return CancelResponse(status="cancelling", message="Cancellation token dispatched.")
         return CancelResponse(status="idle", message="No active job found.")
+
+    def pause_merge(self) -> PauseResponse:
+        if self.active_engine and getattr(self.active_engine, "is_running", False):
+            ok = self.active_engine.pause()
+            if ok:
+                return PauseResponse(status="paused", message="Download paused.")
+            if getattr(self.active_engine, "is_paused", False):
+                return PauseResponse(status="paused", message="Download is already paused.")
+        return PauseResponse(status="idle", message="No active job to pause.")
+
+    def resume_merge(self) -> ResumeResponse:
+        if self.active_engine and getattr(self.active_engine, "is_running", False):
+            ok = self.active_engine.resume()
+            if ok:
+                return ResumeResponse(status="resumed", message="Download resumed.")
+            if not getattr(self.active_engine, "is_paused", False):
+                return ResumeResponse(status="resumed", message="Download is already running.")
+        return ResumeResponse(status="idle", message="No active job to resume.")
+

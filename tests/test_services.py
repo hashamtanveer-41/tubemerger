@@ -112,6 +112,77 @@ class TestProcessUtils(unittest.TestCase):
             env = get_clean_subprocess_env()
             self.assertEqual(env.get("LD_LIBRARY_PATH"), "/orig/lib")
 
+
+class TestPauseResume(unittest.TestCase):
+    def test_engine_pause_and_resume(self):
+        from tubemerge.apps.merger.services.engine import MergeEngine, MergeJobSpec, ProgressSnapshot, PipelineStatus
+        emitted = []
+        spec = MergeJobSpec(
+            playlist_url="https://youtube.com/playlist?list=test",
+            selected_indices=[0],
+            output_filename="test.mp4",
+        )
+        engine = MergeEngine(
+            job_spec=spec,
+            ytdlp_path="/dummy/yt-dlp",
+            ffmpeg_path="/dummy/ffmpeg",
+            metadata_service=MagicMock(),
+            on_progress=lambda s: emitted.append(s),
+        )
+
+        # Initial state
+        self.assertFalse(engine.is_paused)
+
+        # Test pausing
+        ok = engine.pause()
+        self.assertTrue(ok)
+        self.assertTrue(engine.is_paused)
+        self.assertEqual(len(emitted), 1)
+        self.assertEqual(emitted[-1].status, PipelineStatus.PAUSED)
+        self.assertIn("paused", emitted[-1].message.lower())
+
+        # Second pause is idempotent
+        ok2 = engine.pause()
+        self.assertTrue(ok2)
+
+        # Test resume
+        ok_resume = engine.resume()
+        self.assertTrue(ok_resume)
+        self.assertFalse(engine.is_paused)
+        self.assertEqual(emitted[-1].status, PipelineStatus.DOWNLOADING)
+        self.assertIn("resum", emitted[-1].message.lower())
+
+        # Second resume is idempotent
+        ok_resume2 = engine.resume()
+        self.assertTrue(ok_resume2)
+
+
+class TestErrorDiagnostics(unittest.TestCase):
+    def test_mashed_multiple_urls(self):
+        from tubemerge.apps.playlists.services import diagnose_extraction_error
+        url = "https://www.youtube.com/playlist?list=PLX9BFXyidv0Mhttps://music.youtube.com/playlist?list=RDCLAK5uy_nmS3YoxSwVVQk9IE"
+        diag = diagnose_extraction_error(url, "")
+        self.assertEqual(diag.title, "Multiple Links Detected")
+        self.assertIn("Multiple URLs were detected", diag.message)
+
+    def test_http_400_bad_request_diagnosis(self):
+        from tubemerge.apps.playlists.services import diagnose_extraction_error
+        err = "[youtube:tab] PLX9BFXyidv0Mhttps:: Unable to download API page: HTTP Error 400: Bad Request (caused by <HTTPError 400: Bad Request>)"
+        diag = diagnose_extraction_error("https://youtube.com/playlist?list=bad", err)
+        self.assertEqual(diag.title, "Invalid Link Parameter")
+        self.assertIn("Bad Request 400", diag.message)
+        self.assertNotIn("[youtube:tab]", diag.message)
+        self.assertNotIn("HTTPError", diag.message)
+
+    def test_sanitization_removes_raw_ytdlp_syntax(self):
+        from tubemerge.apps.playlists.services import diagnose_extraction_error
+        err = "ERROR: [generic] SomeCustomError:: Some stream failure (caused by <CustomException>)"
+        diag = diagnose_extraction_error("https://youtube.com/watch?v=123", err)
+        self.assertNotIn("ERROR:", diag.message)
+        self.assertNotIn("[generic]", diag.message)
+        self.assertNotIn("caused by", diag.message)
+
+
 if __name__ == "__main__":
     unittest.main()
 

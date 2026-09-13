@@ -1,6 +1,6 @@
 from fastapi import HTTPException
 from tubemerge.apps.binaries.services import BinaryService
-from tubemerge.apps.playlists.services import PlaylistMetadataService
+from tubemerge.apps.playlists.services import PlaylistMetadataService, MediaFetchError
 from tubemerge.apps.playlists.schemas import FetchPlaylistRequest, FetchPlaylistResponse, VideoClipSchema
 
 class PlaylistController:
@@ -18,12 +18,20 @@ class PlaylistController:
         service = self._get_service()
         try:
             playlist = service.fetch_playlist(payload.url)
+        except MediaFetchError as exc:
+            raise HTTPException(
+                status_code=exc.status_code,
+                detail={"error": exc.message, "title": exc.title}
+            )
         except ValueError as exc:
-            raise HTTPException(status_code=422, detail={"error": str(exc)})
+            raise HTTPException(status_code=422, detail={"error": str(exc), "title": "Invalid Request"})
         except TimeoutError as exc:
-            raise HTTPException(status_code=504, detail={"error": str(exc)})
+            raise HTTPException(status_code=504, detail={"error": str(exc), "title": "Request Timed Out"})
         except Exception as exc:
-            raise HTTPException(status_code=500, detail={"error": f"Failed to fetch playlist: {exc}"})
+            clean_err = str(exc)
+            if clean_err.startswith("Failed to fetch playlist:"):
+                clean_err = clean_err.replace("Failed to fetch playlist:", "").strip()
+            raise HTTPException(status_code=400, detail={"error": clean_err, "title": "Fetch Error"})
 
         clips_schema = [
             VideoClipSchema(

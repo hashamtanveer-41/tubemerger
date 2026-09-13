@@ -21,7 +21,13 @@ from fastapi.responses import StreamingResponse
 
 from tubemerge.core.config import MONETIZATION_ACTIVE, PRODUCTION_WEB_URL
 from tubemerge.apps.merger.controllers import MergeController
-from tubemerge.apps.merger.schemas import StartMergeRequest, StartMergeResponse, CancelResponse
+from tubemerge.apps.merger.schemas import (
+    StartMergeRequest,
+    StartMergeResponse,
+    CancelResponse,
+    PauseResponse,
+    ResumeResponse,
+)
 from tubemerge.apps.telemetry.service import TelemetryService
 
 logger = logging.getLogger(__name__)
@@ -97,3 +103,16 @@ async def stream_progress():
 def cancel_merge():
     """Cancel the currently running merge and SIGKILL all child processes."""
     return controller.cancel_merge()
+
+
+@router.post("/pause", response_model=PauseResponse)
+def pause_merge():
+    """Pause active download/merge subprocess and thread."""
+    return controller.pause_merge()
+
+
+@router.post("/resume", response_model=ResumeResponse)
+def resume_merge():
+    """Resume active download/merge subprocess and thread."""
+    return controller.resume_merge()
+

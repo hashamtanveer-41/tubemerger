@@ -8,6 +8,7 @@ class PipelineStatus(str, Enum):
     IDLE = "idle"
     FETCHING = "fetching"
     DOWNLOADING = "downloading"
+    PAUSED = "paused"
     NORMALIZING = "normalizing"
     STITCHING = "stitching"
     EMBEDDING_CHAPTERS = "embedding_chapters"
@@ -36,4 +37,7 @@ class MergeJobSpecification:
     output_dir: Optional[str] = None
     output_filename: Optional[str] = None
     canvas_preset: str = "auto"
+    quality: Optional[str] = "1080p"
     crf: int = 21
+    merge_videos: bool = True
+    media_format: str = "mp4"

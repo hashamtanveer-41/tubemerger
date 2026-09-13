@@ -22,8 +22,8 @@ class VideoStitcherService:
         lines = [escape_posix_path(p) for p in file_paths]
         manifest_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
-    def stitch_segments(self, manifest_path: Path, output_path: Path) -> bool:
-        """Run FFmpeg concat demuxer with stream copy."""
+    def stitch_segments(self, manifest_path: Path, output_path: Path, is_audio: bool = False) -> bool:
+        """Run FFmpeg concat demuxer with stream copy, falling back to audio re-encode for mp3."""
         cmd = [
             self.ffmpeg_path,
             "-y",
@@ -34,7 +34,22 @@ class VideoStitcherService:
             str(output_path),
         ]
         res = subprocess.run(cmd, capture_output=True, text=True, **get_hidden_subprocess_kwargs())
-        return res.returncode == 0 and output_path.exists() and output_path.stat().st_size > 0
+        if res.returncode == 0 and output_path.exists() and output_path.stat().st_size > 0:
+            return True
+        if is_audio:
+            cmd_reencode = [
+                self.ffmpeg_path,
+                "-y",
+                "-f", "concat",
+                "-safe", "0",
+                "-i", str(manifest_path),
+                "-c:a", "libmp3lame",
+                "-q:a", "2",
+                str(output_path),
+            ]
+            res_re = subprocess.run(cmd_reencode, capture_output=True, text=True, **get_hidden_subprocess_kwargs())
+            return res_re.returncode == 0 and output_path.exists() and output_path.stat().st_size > 0
+        return False
 
     @staticmethod
     def build_chapter_metadata(titles: List[str], durations_seconds: List[float]) -> str:

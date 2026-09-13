@@ -22,6 +22,17 @@ def list_queue():
 
 @router.post("", response_model=Dict[str, Any])
 def add_to_queue(payload: EnqueueRequest):
+    url_lower = (payload.playlist_url or "").lower().strip()
+    if "spotify.com" in url_lower:
+        raise HTTPException(
+            status_code=422,
+            detail={"error": "Spotify playlists cannot be queued because Spotify audio streams are DRM-protected. Please queue YouTube links.", "title": "Spotify Not Supported"}
+        )
+    if "music.apple.com" in url_lower or "itunes.apple.com" in url_lower:
+        raise HTTPException(
+            status_code=422,
+            detail={"error": "Apple Music playlists cannot be queued because streams are DRM-protected. Please queue YouTube links.", "title": "Apple Music Not Supported"}
+        )
     return QueueService.enqueue(
         playlist_url=payload.playlist_url,
         playlist_title=payload.playlist_title,
