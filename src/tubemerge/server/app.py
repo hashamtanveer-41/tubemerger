@@ -27,6 +27,7 @@ from tubemerge.apps.system.routes import router as system_router
 from tubemerge.apps.history.routes import router as history_router
 from tubemerge.apps.queues.routes import router as queues_router
 from tubemerge.apps.updates.routes import router as updates_router
+from tubemerge.apps.telemetry.routes import router as telemetry_router
 
 
 @asynccontextmanager
@@ -79,6 +80,7 @@ def create_app() -> FastAPI:
     app.include_router(system_router)
     app.include_router(history_router)
     app.include_router(queues_router)
+    app.include_router(telemetry_router)
 
     # Static assets (logo.png, icons)
     assets_dir = settings.PROJECT_ROOT / "assets"

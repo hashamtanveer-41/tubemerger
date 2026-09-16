@@ -14,6 +14,7 @@ class StartMergeRequest(BaseModel):
     crf: Optional[int] = 21
     merge_videos: Optional[bool] = True
     format: Optional[str] = "mp4"
+    estimated_size_mb: Optional[float] = None
 
 
 class StartMergeResponse(BaseModel):

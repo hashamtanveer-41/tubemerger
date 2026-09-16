@@ -30,5 +30,7 @@ class FetchPlaylistResponse(BaseModel):
     total_duration: str  # alias
     thumbnail: Optional[str] = None
     video_count: int
+    estimated_size_mb: Optional[float] = None
+    estimated_size_formatted: Optional[str] = None
     entries: List[VideoClipSchema]
     videos: List[VideoClipSchema]  # alias

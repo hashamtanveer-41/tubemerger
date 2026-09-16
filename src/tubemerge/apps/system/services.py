@@ -2,10 +2,12 @@
 
 import os
 import json
+import shutil
 import platform
 import subprocess
 from pathlib import Path
 from tubemerge.core import settings
+from tubemerge.utils.process import get_clean_subprocess_env
 
 class SystemService:
     """Invokes native file managers and media players across OS platforms."""
@@ -14,6 +16,8 @@ class SystemService:
     def _clean_path(path_str: str) -> Path:
         """Strip quotes and resolve path."""
         cleaned = (path_str or "").strip().strip("'\"").strip()
+        if not cleaned:
+            return settings.DEFAULT_OUTPUT_DIR
         return Path(cleaned).expanduser().resolve()
 
     @classmethod
@@ -35,18 +39,33 @@ class SystemService:
                 return cls.open_folder(path_str)
 
         system = platform.system()
+        clean_env = get_clean_subprocess_env()
         try:
             if system == "Linux":
-                subprocess.Popen(
-                    ["xdg-open", str(p)],
-                    stdin=subprocess.DEVNULL,
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                    start_new_session=True,
-                )
+                opened = False
+                for bin_name in ["xdg-open", "gio", "vlc", "mpv", "totem"]:
+                    bin_path = shutil.which(bin_name)
+                    if not bin_path:
+                        continue
+                    try:
+                        cmd = [bin_path, "open", str(p)] if bin_name == "gio" else [bin_path, str(p)]
+                        subprocess.Popen(
+                            cmd,
+                            env=clean_env,
+                            stdin=subprocess.DEVNULL,
+                            stdout=subprocess.DEVNULL,
+                            stderr=subprocess.DEVNULL,
+                            start_new_session=True,
+                        )
+                        opened = True
+                        break
+                    except Exception:
+                        continue
+                return opened
             elif system == "Darwin":
                 subprocess.Popen(
                     ["open", str(p)],
+                    env=clean_env,
                     stdin=subprocess.DEVNULL,
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
@@ -66,9 +85,12 @@ class SystemService:
             if p.parent.exists():
                 p = p.parent
             else:
-                return False
+                p = settings.DEFAULT_OUTPUT_DIR
+                if not p.exists():
+                    p = Path.home()
 
         system = platform.system()
+        clean_env = get_clean_subprocess_env()
         try:
             if system == "Windows":
                 if p.is_file():
@@ -85,6 +107,7 @@ class SystemService:
                 if p.is_file():
                     subprocess.Popen(
                         ["open", "-R", str(p)],
+                        env=clean_env,
                         stdin=subprocess.DEVNULL,
                         stdout=subprocess.DEVNULL,
                         stderr=subprocess.DEVNULL,
@@ -93,6 +116,7 @@ class SystemService:
                 else:
                     subprocess.Popen(
                         ["open", str(p)],
+                        env=clean_env,
                         stdin=subprocess.DEVNULL,
                         stdout=subprocess.DEVNULL,
                         stderr=subprocess.DEVNULL,
@@ -100,35 +124,97 @@ class SystemService:
                     )
             elif system == "Linux":
                 target_dir = p if p.is_dir() else p.parent
-                # Try xdg-open first, fallback to gio open
-                try:
-                    subprocess.Popen(
-                        ["xdg-open", str(target_dir)],
-                        stdin=subprocess.DEVNULL,
-                        stdout=subprocess.DEVNULL,
-                        stderr=subprocess.DEVNULL,
-                        start_new_session=True,
-                    )
-                except Exception:
-                    subprocess.Popen(
-                        ["gio", "open", str(target_dir)],
-                        stdin=subprocess.DEVNULL,
-                        stdout=subprocess.DEVNULL,
-                        stderr=subprocess.DEVNULL,
-                        start_new_session=True,
-                    )
+                if not target_dir.exists():
+                    target_dir = settings.DEFAULT_OUTPUT_DIR
+                    if not target_dir.exists():
+                        target_dir = Path.home()
+
+                opened = False
+
+                # 1. If pointing to a specific file, try file-manager select commands (highlights file in GUI)
+                if p.is_file():
+                    if shutil.which("nautilus"):
+                        try:
+                            subprocess.Popen(
+                                ["nautilus", "--select", str(p)],
+                                env=clean_env,
+                                stdin=subprocess.DEVNULL,
+                                stdout=subprocess.DEVNULL,
+                                stderr=subprocess.DEVNULL,
+                                start_new_session=True,
+                            )
+                            opened = True
+                        except Exception:
+                            pass
+                    elif shutil.which("dolphin"):
+                        try:
+                            subprocess.Popen(
+                                ["dolphin", "--select", str(p)],
+                                env=clean_env,
+                                stdin=subprocess.DEVNULL,
+                                stdout=subprocess.DEVNULL,
+                                stderr=subprocess.DEVNULL,
+                                start_new_session=True,
+                            )
+                            opened = True
+                        except Exception:
+                            pass
+
+                # 2. Open directory with standard Linux desktop file managers
+                if not opened:
+                    candidates = ["xdg-open", "gio", "nautilus", "dolphin", "nemo", "thunar", "pcmanfm"]
+                    for bin_name in candidates:
+                        bin_path = shutil.which(bin_name)
+                        if not bin_path:
+                            continue
+                        try:
+                            cmd = [bin_path, "open", str(target_dir)] if bin_name == "gio" else [bin_path, str(target_dir)]
+                            subprocess.Popen(
+                                cmd,
+                                env=clean_env,
+                                stdin=subprocess.DEVNULL,
+                                stdout=subprocess.DEVNULL,
+                                stderr=subprocess.DEVNULL,
+                                start_new_session=True,
+                            )
+                            opened = True
+                            break
+                        except Exception:
+                            continue
+
+                return opened
             return True
         except Exception:
             return False
 
     @classmethod
     def open_url(cls, url: str) -> bool:
-        """Open web URL in host system's default browser."""
+        """Open web URL in host system's default browser with clean environment."""
         cleaned = (url or "").strip()
         if not cleaned.startswith(("http://", "https://")):
             return False
-        import webbrowser
+        system = platform.system()
         try:
+            if system == "Linux":
+                clean_env = get_clean_subprocess_env()
+                for bin_name in ["xdg-open", "gio"]:
+                    bin_path = shutil.which(bin_name)
+                    if not bin_path:
+                        continue
+                    try:
+                        cmd = [bin_path, "open", cleaned] if bin_name == "gio" else [bin_path, cleaned]
+                        subprocess.Popen(
+                            cmd,
+                            env=clean_env,
+                            stdin=subprocess.DEVNULL,
+                            stdout=subprocess.DEVNULL,
+                            stderr=subprocess.DEVNULL,
+                            start_new_session=True,
+                        )
+                        return True
+                    except Exception:
+                        continue
+            import webbrowser
             return webbrowser.open(cleaned)
         except Exception:
             return False
@@ -136,29 +222,14 @@ class SystemService:
     @classmethod
     def get_settings(cls) -> dict:
         """Retrieve persistent user settings from ~/.tubemerger/settings.json."""
-        if not settings.SETTINGS_FILE.exists():
-            return {"tour_completed": False}
-        try:
-            content = settings.SETTINGS_FILE.read_text(encoding="utf-8").strip()
-            if content:
-                data = json.loads(content)
-                if isinstance(data, dict):
-                    return data
-        except Exception:
-            pass
-        return {"tour_completed": False}
+        from tubemerge.apps.system.settings_store import UserSettingsStore
+        return UserSettingsStore.get_settings()
 
     @classmethod
     def update_settings(cls, updates: dict) -> dict:
         """Update persistent settings in ~/.tubemerger/settings.json."""
-        current = cls.get_settings()
-        if isinstance(updates, dict):
-            current.update(updates)
-        try:
-            settings.SETTINGS_FILE.parent.mkdir(parents=True, exist_ok=True)
-            settings.SETTINGS_FILE.write_text(json.dumps(current, indent=2), encoding="utf-8")
-        except Exception:
-            pass
-        return current
+        from tubemerge.apps.system.settings_store import UserSettingsStore
+        return UserSettingsStore.update_settings(updates)
+
 
 

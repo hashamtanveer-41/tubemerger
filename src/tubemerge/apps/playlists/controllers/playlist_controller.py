@@ -51,6 +51,14 @@ class PlaylistController:
             for c in playlist.entries
         ]
 
+        # Standard 1080p estimate: ~3.0 Mbps ≈ 375 KB/s ≈ 0.366 MB/s
+        total_sec = playlist.total_duration_seconds or 0
+        est_mb = round((total_sec * 375) / 1024, 1)
+        if est_mb >= 1024:
+            est_formatted = f"~{est_mb / 1024:.1f} GB"
+        else:
+            est_formatted = f"~{int(est_mb)} MB" if est_mb > 0 else "< 10 MB"
+
         return FetchPlaylistResponse(
             playlist_id=playlist.playlist_id,
             title=playlist.title,
@@ -61,6 +69,8 @@ class PlaylistController:
             total_duration=playlist.total_duration_formatted,
             thumbnail=playlist.thumbnail,
             video_count=playlist.video_count,
+            estimated_size_mb=est_mb,
+            estimated_size_formatted=est_formatted,
             entries=clips_schema,
             videos=clips_schema,
         )

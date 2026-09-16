@@ -1,43 +1,44 @@
-import sys
 """Privacy-Preserving Counter Telemetry Service for TubeMerger.
 
-PRIVACY GUARANTEES:
-  - Raw playlist URLs are NEVER sent, logged, or stored.
-  - Channel names, video titles, account handles are NEVER captured.
-  - User IPs are never stored by Aptabase (GDPR compliant).
-  - Only anonymous scalar event counters & buckets are tracked via Aptabase.
-
-Aptabase Cloud Events:
-  - app_started: App launch, DAU, OS & version distribution
-  - playlist_inspected: Playlist URL fetched & parsed
-  - playlist_merge_started: User initiated a download & stitch
-  - playlist_merge_completed: Pipeline completed rendering successfully
-  - playlist_merge_failed: Pipeline encountered an error
-  - playlist_merge_cancelled: User cancelled an active job
-
-To disable telemetry entirely: set TELEMETRY_APP_KEY = "" in config.py.
+Dispatches anonymous scalar event counters & buckets to Aptabase via background threads.
+Error categorization and scalar bucketing are delegated to dedicated modules.
 """
 
-import asyncio
 import datetime
 import logging
 import platform
 import random
+import sys
 import threading
 import time
+
 try:
     import httpx
 except ImportError:
     httpx = None
 
+from tubemerge.apps.telemetry.bucketing import (
+    bucket_clips,
+    bucket_duration,
+    bucket_size,
+)
+from tubemerge.apps.telemetry.classifier import (
+    categorize_ytdlp_error,
+    is_resolvable_error,
+)
+from tubemerge.core import settings
 from tubemerge.core.config import (
     TELEMETRY_APP_KEY,
     TELEMETRY_HOST,
     TELEMETRY_SMALL_THRESHOLD,
 )
-from tubemerge.core import settings
 
 logger = logging.getLogger(__name__)
+
+# Backward-compatible re-exports
+_bucket_clips = bucket_clips
+_bucket_duration = bucket_duration
+_bucket_size = bucket_size
 
 _APTABASE_ENDPOINT = f"{TELEMETRY_HOST}/api/v0/event"
 _HEADERS = {
@@ -61,30 +62,12 @@ _SYSTEM_PROPS = {
 }
 
 
-def _bucket_clips(clip_count: int) -> str:
-    if clip_count <= 5:
-        return "1-5"
-    if clip_count <= 15:
-        return "6-15"
-    if clip_count <= 30:
-        return "16-30"
-    if clip_count <= 50:
-        return "31-50"
-    return "50+"
-
-
-def _bucket_duration(duration_seconds: float) -> str:
-    if duration_seconds < 60:
-        return "<1m"
-    if duration_seconds < 300:
-        return "1-5m"
-    if duration_seconds < 900:
-        return "5-15m"
-    return "15m+"
-
-
 class TelemetryService:
     """Thread-safe, fire-and-forget anonymous event counter for Aptabase."""
+
+    categorize_ytdlp_error = staticmethod(categorize_ytdlp_error)
+    is_resolvable_error = staticmethod(is_resolvable_error)
+    _bucket_size = staticmethod(bucket_size)
 
     @staticmethod
     def _send_sync(payload: dict) -> None:
@@ -129,46 +112,81 @@ class TelemetryService:
         cls._dispatch("app_started")
 
     @classmethod
-    def track_playlist_inspected(cls, clip_count: int) -> None:
+    def track_playlist_inspected(
+        cls,
+        clip_count: int,
+        playlist_size_mb: float | None = None,
+    ) -> None:
         """Call when a playlist URL is fetched and parsed."""
-        cls._dispatch(
-            "playlist_inspected",
-            props={
-                "clip_count_bucket": _bucket_clips(clip_count),
-                "clip_count": clip_count,
-            },
-        )
+        props: dict = {
+            "clip_count_bucket": bucket_clips(clip_count),
+            "clip_count": clip_count,
+        }
+        if playlist_size_mb is not None:
+            props["playlist_size_mb"] = round(playlist_size_mb, 1)
+            props["playlist_size_bucket"] = bucket_size(playlist_size_mb)
+        cls._dispatch("playlist_inspected", props=props)
 
     @classmethod
-    def track_job_triggered(cls, clip_count: int, preset: str = "auto") -> None:
+    def track_job_triggered(
+        cls,
+        clip_count: int,
+        preset: str = "auto",
+        playlist_size_mb: float | None = None,
+    ) -> None:
         """Call when a playlist merge job is initiated."""
-        cls._dispatch(
-            "playlist_merge_started",
-            props={
-                "clip_count_bucket": _bucket_clips(clip_count),
-                "clip_count": clip_count,
-                "preset": preset,
-            },
-        )
+        props: dict = {
+            "clip_count_bucket": bucket_clips(clip_count),
+            "clip_count": clip_count,
+            "preset": preset,
+        }
+        if playlist_size_mb is not None:
+            props["playlist_size_mb"] = round(playlist_size_mb, 1)
+            props["playlist_size_bucket"] = bucket_size(playlist_size_mb)
+        cls._dispatch("playlist_merge_started", props=props)
 
     @classmethod
     def track_job_completed(cls, duration_seconds: float | None = None, clip_count: int | None = None) -> None:
         """Call when a playlist merge job finishes rendering."""
         props = {}
         if duration_seconds is not None:
-            props["duration_bucket"] = _bucket_duration(duration_seconds)
+            props["duration_bucket"] = bucket_duration(duration_seconds)
             props["duration_seconds"] = int(duration_seconds)
         if clip_count is not None:
             props["clip_count"] = clip_count
-            props["clip_count_bucket"] = _bucket_clips(clip_count)
+            props["clip_count_bucket"] = bucket_clips(clip_count)
         cls._dispatch("playlist_merge_completed", props=props)
 
     @classmethod
-    def track_job_failed(cls, error_type: str = "general_error") -> None:
+    def track_job_failed(
+        cls,
+        error_type: str = "general_error",
+        error_subtype: str | None = None,
+        clip_count: int | None = None,
+        selected_preset: str | None = None,
+        playlist_size_mb: float | None = None,
+    ) -> None:
         """Call when a playlist merge job fails."""
-        cls._dispatch("playlist_merge_failed", props={"error_type": error_type})
+        props: dict = {
+            "error_type": error_type,
+            "error_subtype": error_subtype or "unknown",
+        }
+        if clip_count is not None:
+            props["clip_count"] = clip_count
+            props["clip_count_bucket"] = bucket_clips(clip_count)
+        if selected_preset:
+            props["selected_preset"] = selected_preset
+        if playlist_size_mb is not None:
+            props["playlist_size_mb"] = round(playlist_size_mb, 1)
+            props["playlist_size_bucket"] = bucket_size(playlist_size_mb)
+        cls._dispatch("playlist_merge_failed", props=props)
 
     @classmethod
     def track_job_cancelled(cls) -> None:
         """Call when an active merge job is cancelled by the user."""
         cls._dispatch("playlist_merge_cancelled")
+
+    @classmethod
+    def track_custom_event(cls, event_name: str, props: dict | None = None) -> None:
+        """Dispatch arbitrary anonymous telemetry event (e.g. from frontend issue reporting)."""
+        cls._dispatch(event_name, props=props)

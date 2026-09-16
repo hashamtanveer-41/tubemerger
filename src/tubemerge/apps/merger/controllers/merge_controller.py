@@ -70,6 +70,7 @@ class MergeController:
             crf=payload.crf or 21,
             merge_videos=payload.merge_videos if payload.merge_videos is not None else True,
             media_format=media_fmt,
+            estimated_size_mb=payload.estimated_size_mb,
         )
 
         # Build metadata service (needs ytdlp path)
@@ -90,12 +91,22 @@ class MergeController:
                     TelemetryService.track_job_completed(duration_seconds=duration, clip_count=clip_cnt)
                 elif snapshot.status == PipelineStatus.ERROR:
                     err_msg = str(snapshot.error or snapshot.message or "")
+                    from tubemerge.apps.telemetry.service import categorize_ytdlp_error
+                    err_sub = getattr(snapshot, "error_subtype", None) or categorize_ytdlp_error(err_msg)
                     err_type = (
                         "ffmpeg_error" if "ffmpeg" in err_msg.lower()
-                        else ("ytdlp_error" if "ytdlp" in err_msg.lower() or "download" in err_msg.lower()
+                        else ("ytdlp_error" if "ytdlp" in err_msg.lower() or "download" in err_msg.lower() or "video" in err_msg.lower()
                               else "pipeline_error")
                     )
-                    TelemetryService.track_job_failed(error_type=err_type)
+                    clip_cnt = len(job_spec.selected_indices) if job_spec.selected_indices else (snapshot.total_items or None)
+                    preset = "separate_videos" if not job_spec.merge_videos else ("mp3_audio" if job_spec.media_format == "mp3" else job_spec.canvas_preset)
+                    TelemetryService.track_job_failed(
+                        error_type=err_type,
+                        error_subtype=err_sub,
+                        clip_count=clip_cnt,
+                        selected_preset=preset,
+                        playlist_size_mb=job_spec.estimated_size_mb,
+                    )
                 elif snapshot.status == PipelineStatus.CANCELLED:
                     TelemetryService.track_job_cancelled()
 
@@ -127,6 +138,7 @@ class MergeController:
                 while True:
                     try:
                         snapshot: ProgressSnapshot = await asyncio.wait_for(q.get(), timeout=15.0)
+                        from tubemerge.apps.telemetry.service import categorize_ytdlp_error
                         data = {
                             "status": snapshot.status.value
                                 if hasattr(snapshot.status, "value") else snapshot.status,
@@ -138,6 +150,8 @@ class MergeController:
                             "speed": getattr(snapshot, "speed", None),
                             "output_file": snapshot.output_file,
                             "error": snapshot.error,
+                            "error_subtype": getattr(snapshot, "error_subtype", None) or (categorize_ytdlp_error(str(snapshot.error or "")) if snapshot.error else None),
+                            "is_resolvable": getattr(snapshot, "is_resolvable", False),
                         }
                         yield f"data: {json.dumps(data)}\n\n"
                         terminal = (

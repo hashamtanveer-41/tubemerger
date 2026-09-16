@@ -10,5 +10,8 @@ controller = PlaylistController()
 def fetch_playlist(payload: FetchPlaylistRequest):
     res = controller.fetch_playlist(payload)
     clip_count = len(res.entries) if hasattr(res, "entries") and res.entries else 0
-    TelemetryService.track_playlist_inspected(clip_count=clip_count)
+    TelemetryService.track_playlist_inspected(
+        clip_count=clip_count,
+        playlist_size_mb=getattr(res, "estimated_size_mb", None),
+    )
     return res

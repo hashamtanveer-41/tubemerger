@@ -54,6 +54,7 @@ async def start_merge(
         TelemetryService.track_job_triggered,
         clip_count=clip_count,
         preset="separate_videos" if payload.merge_videos is False else (payload.canvas_preset or "auto"),
+        playlist_size_mb=payload.estimated_size_mb,
     )
 
     # ── Monetization: open browser to ad-supported wait page ─────────────────

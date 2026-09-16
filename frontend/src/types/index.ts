@@ -24,6 +24,8 @@ export interface Playlist {
   thumbnail?: string;
   video_count: number;
   entries: VideoClip[];
+  estimated_size_mb?: number;
+  estimated_size_formatted?: string;
 }
 
 export type PipelineStatus =
@@ -48,6 +50,8 @@ export interface ProgressEvent {
   speed?: string;
   output_file?: string;
   error?: string;
+  error_subtype?: string;
+  is_resolvable?: boolean;
 }
 
 export interface BinaryItem {
@@ -194,4 +198,15 @@ export interface UpdateInfo {
   published_at?: string;
   download_url?: string;
   website_download_url: string;
+}
+
+export interface FailureInfo {
+  error: string;
+  errorSubtype: string;
+  isResolvable: boolean;
+  clipCount: number;
+  preset: string;
+  playlistSize?: string;
+  playlistUrl?: string;
+  playlistTitle?: string;
 }

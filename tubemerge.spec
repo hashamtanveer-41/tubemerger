@@ -55,6 +55,10 @@ hidden_imports = [
     "tubemerge.server.app",
     "tubemerge.db",
     "tubemerge.db.connection",
+    "tubemerge.desktop",
+    "tubemerge.desktop.env",
+    "tubemerge.desktop.server_runner",
+    "tubemerge.desktop.window",
     "tubemerge.apps",
     "tubemerge.apps.binaries",
     "tubemerge.apps.binaries.routes",
@@ -62,10 +66,20 @@ hidden_imports = [
     "tubemerge.apps.playlists",
     "tubemerge.apps.playlists.routes",
     "tubemerge.apps.playlists.services",
+    "tubemerge.apps.playlists.diagnostics",
+    "tubemerge.apps.playlists.extractor",
     "tubemerge.apps.merger",
     "tubemerge.apps.merger.routes",
     "tubemerge.apps.merger.services",
     "tubemerge.apps.merger.services.engine",
+    "tubemerge.apps.merger.services.specs",
+    "tubemerge.apps.merger.services.process_manager",
+    "tubemerge.apps.merger.services.format_builder",
+    "tubemerge.apps.merger.services.progress_parser",
+    "tubemerge.apps.merger.services.downloaders",
+    "tubemerge.apps.merger.services.downloaders.single_downloader",
+    "tubemerge.apps.merger.services.downloaders.folder_downloader",
+    "tubemerge.apps.merger.services.downloaders.merge_pipeline",
     "tubemerge.apps.merger.services.normalizer",
     "tubemerge.apps.merger.services.stitcher",
     "tubemerge.apps.merger.controllers",
@@ -73,6 +87,7 @@ hidden_imports = [
     "tubemerge.apps.system",
     "tubemerge.apps.system.routes",
     "tubemerge.apps.system.services",
+    "tubemerge.apps.system.settings_store",
     "tubemerge.apps.history",
     "tubemerge.apps.history.routes",
     "tubemerge.apps.history.services",
@@ -81,6 +96,8 @@ hidden_imports = [
     "tubemerge.apps.queues.services",
     "tubemerge.apps.telemetry",
     "tubemerge.apps.telemetry.service",
+    "tubemerge.apps.telemetry.classifier",
+    "tubemerge.apps.telemetry.bucketing",
     "tubemerge.utils",
     "tubemerge.utils.file_system",
     "tubemerge.utils.process",
@@ -167,6 +184,19 @@ if sys.platform.startswith("linux"):
     except Exception:
         pass
 
+    # Bundle WebKit2, Soup, and JavaScriptCore typelibs into gi_typelibs
+    gi_typelib_dirs = [
+        "/usr/lib/x86_64-linux-gnu/girepository-1.0",
+        "/usr/lib/girepository-1.0",
+        "/usr/lib64/girepository-1.0",
+        "/usr/local/lib/girepository-1.0",
+    ]
+    for d in gi_typelib_dirs:
+        if os.path.isdir(d):
+            for f in os.listdir(d):
+                if any(f.startswith(prefix) for prefix in ("WebKit2-", "Soup-", "JavaScriptCore-")) and f.endswith(".typelib"):
+                    datas.append((os.path.join(d, f), "gi_typelibs"))
+
     linux_gui_hidden = [
         "gi",
         "gi.repository",
@@ -176,6 +206,8 @@ if sys.platform.startswith("linux"):
         "gi.repository.GObject",
         "gi.repository.Gio",
         "gi.repository.WebKit2",
+        "gi.repository.Soup",
+        "gi.repository.JavaScriptCore",
         "webview.platforms.gtk",
         "webview.platforms.qt",
     ]

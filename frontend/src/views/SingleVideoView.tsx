@@ -258,15 +258,18 @@ export function SingleVideoView({
           <Button
             id="single-video-download-btn"
             size="default"
-            disabled={!video}
+            disabled={!video || loading}
+            loading={loading}
             onClick={() => onDownload({ format: selectedFormat, quality: (selectedFormat === 'mp3' ? audioQuality : quality) as any })}
             icon={Download}
             className="px-6 h-10 font-bold text-xs sm:text-sm cursor-pointer shadow-lg shadow-red-950/30 disabled:opacity-50"
-            title={video ? 'Start download' : 'Enter a video URL above first'}
+            title={video ? (loading ? 'Starting download…' : 'Start download') : 'Enter a video URL above first'}
           >
-            {video
-              ? selectedFormat === 'mp3' ? `Download MP3 (${audioQuality})` : `Download (${quality})`
-              : selectedFormat === 'mp3' ? 'Download MP3' : 'Download Video'}
+            {loading
+              ? 'Starting Download…'
+              : video
+                ? selectedFormat === 'mp3' ? `Download MP3 (${audioQuality})` : `Download (${quality})`
+                : selectedFormat === 'mp3' ? 'Download MP3' : 'Download Video'}
           </Button>
         </div>
       </Card>

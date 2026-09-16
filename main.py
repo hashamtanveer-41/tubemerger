@@ -33,6 +33,15 @@ SRC_DIR = Path(__file__).resolve().parent / "src"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
+# If running unbundled and local .venv exists, ensure we run with .venv python where webview is installed
+if not getattr(sys, "frozen", False):
+    venv_python = Path(__file__).resolve().parent / ".venv" / "bin" / "python"
+    if venv_python.exists() and sys.executable != str(venv_python):
+        try:
+            import webview
+        except ImportError:
+            os.execv(str(venv_python), [str(venv_python)] + sys.argv)
+
 from tubemerge.app import run
 
 if __name__ == "__main__":

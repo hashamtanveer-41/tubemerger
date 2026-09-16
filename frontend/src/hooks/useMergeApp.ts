@@ -1,55 +1,100 @@
-import { useState, useEffect } from 'react';
+/**
+ * Top-level application coordinator hook.
+ *
+ * Composes domain-specific hooks (Toast, Auth, License, Playlist, Pipeline)
+ * into a single unified state interface for the application views.
+ */
+
+import { useState, useEffect, useCallback } from 'react';
 import { api } from '@/services/api';
-import { Playlist, HealthStatus, ProgressEvent, UserProfile, LicenseInfo, UsageMetrics, ActiveDevice, AuthResponse, VideoQuality } from '@/types';
-import { ToastData } from '@/components/ui/toast';
+import { HealthStatus, Playlist, AuthResponse } from '@/types';
+import { useToast } from './useToast';
+import { useAuth } from './useAuth';
+import { useLicense } from './useLicense';
+import { usePlaylistSelection } from './usePlaylistSelection';
+import { useMergePipeline } from './useMergePipeline';
 
 export function useMergeApp() {
   const [activeTab, setActiveTab] = useState('home');
   const [health, setHealth] = useState<HealthStatus | null>(null);
 
-  const [fetching, setFetching] = useState(false);
-  const [playlist, setPlaylist] = useState<Playlist | null>(null);
-  const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
-  const [toast, setToast] = useState<ToastData | null>(null);
-  const [searchQuery, setSearchQuery] = useState<string>('');
+  // 1. Toast subsystem
+  const { toast, setToast, showToast, dismissToast } = useToast();
 
-  const [isMerging, setIsMerging] = useState(false);
-  const [progress, setProgress] = useState<ProgressEvent | null>(null);
-  const [outputFile, setOutputFile] = useState<string | null>(null);
-  const [isPaused, setIsPaused] = useState<boolean>(false);
-  const [mergeVideos, setMergeVideos] = useState<boolean>(true);
-  const [quality, setQuality] = useState<VideoQuality>('1080p');
-  const [format, setFormat] = useState<'mp4' | 'mp3'>('mp4');
+  // 2. Auth subsystem
+  const {
+    profile,
+    setProfile,
+    activeDevices,
+    setActiveDevices,
+    isAuthModalOpen,
+    setIsAuthModalOpen,
+    onAuthSuccess: onAuthSuccessBase,
+    handleLogout: handleLogoutBase,
+    handleDeactivateDevice,
+  } = useAuth(showToast);
 
-  // Auth & Cloud Workstations State
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-  const [activeDevices, setActiveDevices] = useState<ActiveDevice[]>([]);
+  // 3. License & Quota subsystem
+  const {
+    license,
+    setLicense,
+    usage,
+    setUsage,
+    recordRequest,
+    refreshUsage,
+    refreshLicense,
+    activateLicense,
+    deactivateLicense,
+    DEFAULT_LICENSE,
+    DEFAULT_USAGE,
+  } = useLicense();
 
-  // Profile, License & Usage Telemetry State
-  const [profile, setProfile] = useState<UserProfile | null>(null);
+  // 4. Playlist Selection subsystem
+  const {
+    searchQuery,
+    setSearchQuery,
+    fetching,
+    setFetching,
+    playlist,
+    setPlaylist,
+    selectedIndices,
+    setSelectedIndices,
+    selectedClips,
+    isSingleVideoUrl,
+    validateUrl,
+    toggleIndex,
+    selectAll,
+    deselectAll,
+  } = usePlaylistSelection(showToast);
 
-  const [license, setLicense] = useState<LicenseInfo>({
-    status: 'unlicensed',
-    plan_tier: 'FREE',
-    license_key: null,
-    expires_at: null,
-    hardware_id: '',
-    max_devices: 1,
-    active_devices: 1,
-  });
+  // 5. Merge Pipeline subsystem
+  const {
+    isMerging,
+    setIsMerging,
+    progress,
+    setProgress,
+    outputFile,
+    setOutputFile,
+    failureInfo,
+    setFailureInfo,
+    isPaused,
+    setIsPaused,
+    mergeVideos,
+    setMergeVideos,
+    quality,
+    setQuality,
+    format,
+    setFormat,
+    pauseMerge,
+    resumeMerge,
+    cancelMerge,
+    dismissFailureModal,
+  } = useMergePipeline(showToast);
 
-  const [usage, setUsage] = useState<UsageMetrics>({
-    requests_today: 0,
-    daily_quota: 3,
-    total_lifetime_merges: 0,
-    total_minutes_processed: 0,
-    quota_reset_in_hours: 24,
-  });
-
+  // Bootstrapping session & health
   useEffect(() => {
     api.getHealth().then(setHealth).catch(() => {});
 
-    // Check existing Supabase session first
     api.getAuthMe().then((authData) => {
       if (authData) {
         setProfile(authData.user);
@@ -61,87 +106,67 @@ export function useMergeApp() {
           max_devices: authData.max_devices,
         }));
       }
-      // Re-fetch usage and license with active auth headers
-      api.getAccountUsage().then(setUsage).catch(() => {});
-      api.getLicenseStatus().then(setLicense).catch(() => {});
+      refreshUsage();
+      refreshLicense();
     }).catch(() => {
-      api.getAccountUsage().then(setUsage).catch(() => {});
-      api.getLicenseStatus().then(setLicense).catch(() => {});
+      refreshUsage();
+      refreshLicense();
     });
-  }, []);
+  }, [refreshUsage, refreshLicense, setProfile, setActiveDevices, setLicense]);
 
-  const showToast = (message: string, type: 'error' | 'success' | 'info' = 'error', title?: string) => {
-    setToast({ message, type, title });
-  };
-
-  const dismissToast = () => {
-    setToast(null);
-  };
-
-  const recordRequest = () => {
-    setUsage((prev) => ({
+  const onAuthSuccess = useCallback((authData: AuthResponse) => {
+    onAuthSuccessBase(authData);
+    setLicense((prev) => ({
       ...prev,
-      requests_today: prev.requests_today + 1,
+      status: 'active',
+      plan_tier: (authData.plan_tier === 'CREATOR_PRO' ? 'PRO' : (authData.plan_tier as any)) || 'PRO',
+      max_devices: authData.max_devices,
     }));
-  };
+    refreshUsage();
+    refreshLicense();
+  }, [onAuthSuccessBase, setLicense, refreshUsage, refreshLicense]);
 
-  const isSingleVideoUrl = (u: string) => {
-    const trimmed = (u || '').trim().toLowerCase();
-    const isYtVideo = (trimmed.includes('watch?v=') || trimmed.includes('youtu.be/') || trimmed.includes('/shorts/'));
-    const isPlaylist = trimmed.includes('list=');
-    return isYtVideo && !isPlaylist;
-  };
+  const handleLogout = useCallback(async () => {
+    await handleLogoutBase();
+    setLicense(DEFAULT_LICENSE);
+    setUsage(DEFAULT_USAGE);
+    refreshUsage();
+    refreshLicense();
+  }, [handleLogoutBase, setLicense, setUsage, DEFAULT_LICENSE, DEFAULT_USAGE, refreshUsage, refreshLicense]);
 
-  const searchPlaylist = async (url: string) => {
+  // Queue runner
+  const checkAndRunNextQueue = useCallback(async () => {
+    try {
+      const queues = await api.getQueues();
+      const pending = queues.filter((q) => q.status === 'pending');
+      if (pending.length > 0) {
+        const nextJob = pending[0];
+        showToast(`Starting next queued job: ${nextJob.playlist_title}`, 'info');
+        await api.deleteQueueItem(nextJob.id);
+        const nextPl = await api.fetchPlaylist(nextJob.playlist_url);
+        setPlaylist(nextPl);
+        setSelectedIndices(new Set(nextPl.entries.map((_, i) => i)));
+        setActiveTab(nextPl.entries.length === 1 ? 'single-video' : 'merge');
+        setTimeout(() => {
+          startMerge({
+            format: format,
+            overridePlaylist: nextPl,
+          });
+        }, 1200);
+      }
+    } catch {
+      // Ignored
+    }
+  }, [showToast, setPlaylist, setSelectedIndices, setActiveTab, format]);
+
+  // Search playlist
+  const searchPlaylist = useCallback(async (url: string) => {
     const clean = (url || '').trim();
     if (!clean) return;
     setSearchQuery(clean);
 
-    const lower = clean.toLowerCase();
-    if (lower.includes('spotify.com')) {
-      showToast(
-        'Spotify playlists and tracks cannot be downloaded directly because Spotify streams are protected by DRM encryption. Please search for the playlist or song title on YouTube and paste the YouTube link here.',
-        'error',
-        'Spotify Not Supported'
-      );
-      return;
-    }
-    if (lower.includes('music.apple.com') || lower.includes('itunes.apple.com')) {
-      showToast(
-        'Apple Music tracks and playlists are DRM-encrypted and cannot be extracted directly. Please paste a YouTube or YouTube Music playlist link instead.',
-        'error',
-        'Apple Music Not Supported'
-      );
-      return;
-    }
-    if (lower.includes('tidal.com') || lower.includes('deezer.com')) {
-      showToast(
-        'Commercial subscription streaming services use DRM encryption and cannot be downloaded. Please paste a YouTube or YouTube Music link instead.',
-        'error',
-        'Streaming Service Not Supported'
-      );
-      return;
-    }
-    const protocolMatches = clean.match(/https?:\/\//gi) || [];
-    if (protocolMatches.length > 1 || /list=[^&]*https?:\/\//i.test(clean)) {
-      showToast(
-        'Multiple URLs were detected concatenated together in the search bar. Please click "Clear" and paste only a single clean YouTube link.',
-        'error',
-        'Multiple Links Detected'
-      );
-      return;
-    }
+    if (!validateUrl(clean)) return;
 
-    if (!lower.startsWith('http://') && !lower.startsWith('https://')) {
-      showToast(
-        'Please enter a valid web URL starting with https:// (e.g. https://www.youtube.com/playlist?list=...)',
-        'error',
-        'Invalid URL Format'
-      );
-      return;
-    }
-
-    // If a merge/download is already running, notify and add to SQLite queue
     if (isMerging) {
       try {
         setFetching(true);
@@ -183,7 +208,6 @@ export function useMergeApp() {
       let rawMsg = err?.message || 'Could not fetch metadata for this link.';
       let cleanMsg = rawMsg.replace(/^(Failed to fetch playlist:\s*)+/i, '').trim();
 
-      // Sanitize raw yt-dlp tags, exception wrappers, and extractor syntax
       cleanMsg = cleanMsg.replace(/^ERROR:\s*/i, '');
       cleanMsg = cleanMsg.replace(/\[[a-zA-Z0-9_:.\-]+\]\s*/g, '');
       cleanMsg = cleanMsg.replace(/^[a-zA-Z0-9_\-:]+::\s*/g, '');
@@ -206,51 +230,24 @@ export function useMergeApp() {
     } finally {
       setFetching(false);
     }
-  };
+  }, [
+    isMerging,
+    quality,
+    recordRequest,
+    setFetching,
+    setOutputFile,
+    setPlaylist,
+    setProgress,
+    setSearchQuery,
+    setSelectedIndices,
+    setToast,
+    showToast,
+    validateUrl,
+    isSingleVideoUrl,
+  ]);
 
-  const toggleIndex = (index: number) => {
-    setSelectedIndices((prev) => {
-      const next = new Set(prev);
-      if (next.has(index)) next.delete(index);
-      else next.add(index);
-      return next;
-    });
-  };
-
-  const selectAll = () => {
-    if (!playlist) return;
-    setSelectedIndices(new Set(playlist.entries.map((_, i) => i)));
-  };
-
-  const deselectAll = () => {
-    setSelectedIndices(new Set());
-  };
-
-  const checkAndRunNextQueue = async () => {
-    try {
-      const queues = await api.getQueues();
-      const pending = queues.filter((q) => q.status === 'pending');
-      if (pending.length > 0) {
-        const nextJob = pending[0];
-        showToast(`Starting next queued job: ${nextJob.playlist_title}`, 'info');
-        await api.deleteQueueItem(nextJob.id);
-        const nextPl = await api.fetchPlaylist(nextJob.playlist_url);
-        setPlaylist(nextPl);
-        setSelectedIndices(new Set(nextPl.entries.map((_, i) => i)));
-        setActiveTab(nextPl.entries.length === 1 ? 'single-video' : 'merge');
-        setTimeout(() => {
-          startMerge({
-            format: format,
-            overridePlaylist: nextPl,
-          });
-        }, 1200);
-      }
-    } catch {
-      // Ignored
-    }
-  };
-
-  const startMerge = async (opts?: {
+  // Start merge pipeline
+  const startMerge = useCallback(async (opts?: {
     overrideFormat?: 'mp4' | 'mp3';
     overrideMergeVideos?: boolean;
     overridePlaylist?: Playlist;
@@ -258,25 +255,34 @@ export function useMergeApp() {
     format?: 'mp4' | 'mp3';
   }) => {
     const currentPl = opts?.overridePlaylist || playlist;
-    if (!currentPl || selectedIndices.size === 0) return;
+    if (!currentPl) return;
+
+    let targetIndices = selectedIndices;
+    if (targetIndices.size === 0 && currentPl.entries.length > 0) {
+      targetIndices = new Set([0]);
+      setSelectedIndices(targetIndices);
+    }
+    if (targetIndices.size === 0) {
+      showToast('No videos selected to download.', 'info');
+      return;
+    }
 
     const chosenFormat = opts?.overrideFormat || opts?.format || format;
     const shouldMerge = opts?.overrideMergeVideos !== undefined ? opts.overrideMergeVideos : mergeVideos;
-    const chosenQuality = opts?.overrideQuality || (chosenFormat === 'mp3' && !['320k', '256k', '192k', '128k'].includes(quality) ? '320k' : quality);
+    const chosenQuality =
+      opts?.overrideQuality ||
+      (chosenFormat === 'mp3' && !['320k', '256k', '192k', '128k'].includes(quality) ? '320k' : quality);
 
-    const sortedClips = Array.from(selectedIndices)
-      .sort((a, b) => a - b)
-      .map((i) => currentPl.entries[i])
-      .filter(Boolean);
-
+    setActiveTab('merge');
     setIsMerging(true);
     setIsPaused(false);
     setToast(null);
+    setFailureInfo(null);
     recordRequest();
     setProgress({
       status: 'downloading',
       current_item: 1,
-      total_items: selectedIndices.size || currentPl.video_count,
+      total_items: targetIndices.size || currentPl.video_count,
       current_video_title: currentPl.entries[0]?.title || currentPl.title,
       overall_percent: 0,
       message: 'Initializing download pipeline…',
@@ -285,11 +291,12 @@ export function useMergeApp() {
     try {
       await api.startMerge({
         url: currentPl.webpage_url,
-        selected_indices: Array.from(selectedIndices).sort((a, b) => a - b),
+        selected_indices: Array.from(targetIndices).sort((a, b) => a - b),
         merge_videos: shouldMerge,
         quality: chosenQuality,
         canvas_preset: chosenQuality,
         format: chosenFormat,
+        estimated_size_mb: currentPl.estimated_size_mb,
       });
 
       const disconnect = api.connectProgress(
@@ -304,7 +311,7 @@ export function useMergeApp() {
             setIsPaused(false);
             if (event.output_file) {
               setOutputFile(event.output_file);
-              api.getAccountUsage().then(setUsage).catch(() => {});
+              refreshUsage();
               showToast(
                 shouldMerge
                   ? `${chosenFormat.toUpperCase()} merge completed successfully!`
@@ -317,6 +324,20 @@ export function useMergeApp() {
           } else if (event.status === 'error' || event.status === 'cancelled') {
             setIsMerging(false);
             setIsPaused(false);
+            if (event.status === 'error') {
+              const isResolvable = event.is_resolvable ?? false;
+              const errorSubtype = event.error_subtype || 'ytdlp_generic';
+              setFailureInfo({
+                error: event.error || 'Download pipeline encountered an error.',
+                errorSubtype,
+                isResolvable,
+                clipCount: selectedIndices.size || currentPl.video_count,
+                preset: chosenQuality,
+                playlistSize: currentPl.estimated_size_formatted,
+                playlistUrl: currentPl.webpage_url,
+                playlistTitle: currentPl.title,
+              });
+            }
             if (event.error) {
               showToast(event.error, 'error');
             }
@@ -328,65 +349,42 @@ export function useMergeApp() {
     } catch (err: any) {
       setIsMerging(false);
       setIsPaused(false);
+      setFailureInfo({
+        error: err.message || 'Failed to start download pipeline.',
+        errorSubtype: 'pipeline_init_failure',
+        isResolvable: true,
+        clipCount: selectedIndices.size || currentPl.video_count,
+        preset: chosenQuality,
+        playlistSize: currentPl.estimated_size_formatted,
+        playlistUrl: currentPl.webpage_url,
+        playlistTitle: currentPl.title,
+      });
       showToast(err.message || 'Failed to start download pipeline.', 'error');
     }
-  };
+  }, [
+    playlist,
+    selectedIndices,
+    format,
+    mergeVideos,
+    quality,
+    recordRequest,
+    setIsMerging,
+    setIsPaused,
+    setToast,
+    setFailureInfo,
+    setProgress,
+    setOutputFile,
+    refreshUsage,
+    showToast,
+    checkAndRunNextQueue,
+  ]);
 
-  const pauseMerge = async () => {
-    setIsPaused(true);
-    setProgress((prev) =>
-      prev
-        ? {
-            ...prev,
-            status: 'paused',
-            message: 'Download paused. Click Resume to continue.',
-            speed: undefined,
-          }
-        : null
-    );
-    try {
-      const res = await api.pauseMerge();
-      if (res.status === 'idle') {
-        setIsPaused(false);
-        showToast(res.message || 'No active download to pause.', 'info');
-      }
-    } catch (err: any) {
-      setIsPaused(false);
-      showToast(err.message || 'Failed to pause download.', 'error');
-    }
-  };
+  const retryMerge = useCallback(() => {
+    setFailureInfo(null);
+    startMerge();
+  }, [setFailureInfo, startMerge]);
 
-  const resumeMerge = async () => {
-    setIsPaused(false);
-    setProgress((prev) =>
-      prev
-        ? {
-            ...prev,
-            status: 'downloading',
-            message: 'Resuming download…',
-          }
-        : null
-    );
-    try {
-      const res = await api.resumeMerge();
-      if (res.status === 'idle') {
-        showToast(res.message || 'No active download to resume.', 'info');
-      }
-    } catch (err: any) {
-      setIsPaused(true);
-      showToast(err.message || 'Failed to resume download.', 'error');
-    }
-  };
-
-  const cancelMerge = async () => {
-    await api.cancelMerge();
-    setIsMerging(false);
-    setIsPaused(false);
-    setProgress(null);
-    showToast('Download cancelled.', 'info');
-  };
-
-  const reset = () => {
+  const reset = useCallback(() => {
     setPlaylist(null);
     setSelectedIndices(new Set());
     setProgress(null);
@@ -395,87 +393,7 @@ export function useMergeApp() {
     setToast(null);
     setSearchQuery('');
     setActiveTab('home');
-  };
-
-  const activateLicense = async (key: string): Promise<boolean> => {
-    try {
-      const updated = await api.activateLicense(key);
-      setLicense(updated);
-      const updatedUsage = await api.getAccountUsage();
-      setUsage(updatedUsage);
-      return true;
-    } catch {
-      return false;
-    }
-  };
-
-  const deactivateLicense = async (): Promise<boolean> => {
-    try {
-      const updated = await api.deactivateLicense();
-      setLicense(updated);
-      const updatedUsage = await api.getAccountUsage();
-      setUsage(updatedUsage);
-      return true;
-    } catch {
-      return false;
-    }
-  };
-
-  const onAuthSuccess = (authData: AuthResponse) => {
-    setProfile(authData.user);
-    setActiveDevices(authData.active_devices);
-    setLicense((prev) => ({
-      ...prev,
-      status: 'active',
-      plan_tier: (authData.plan_tier === 'CREATOR_PRO' ? 'PRO' : (authData.plan_tier as any)) || 'PRO',
-      max_devices: authData.max_devices,
-    }));
-    api.getAccountUsage().then(setUsage).catch(() => {});
-    api.getLicenseStatus().then(setLicense).catch(() => {});
-    showToast(`Welcome, ${authData.user.full_name || authData.user.name}!`, 'success');
-  };
-
-  const handleLogout = async () => {
-    await api.logout();
-    setProfile(null);
-    setActiveDevices([]);
-    setLicense({
-      status: 'unlicensed',
-      plan_tier: 'FREE',
-      license_key: null,
-      expires_at: null,
-      hardware_id: '',
-      max_devices: 1,
-      active_devices: 1,
-    });
-    setUsage({
-      requests_today: 0,
-      daily_quota: 3,
-      total_lifetime_merges: 0,
-      total_minutes_processed: 0,
-      quota_reset_in_hours: 24,
-    });
-    api.getAccountUsage().then(setUsage).catch(() => {});
-    api.getLicenseStatus().then(setLicense).catch(() => {});
-    showToast('Signed out of Supabase cloud.', 'info');
-  };
-
-  const handleDeactivateDevice = async (hwid: string) => {
-    try {
-      const updated = await api.deactivateDevice(hwid);
-      setActiveDevices(updated.active_devices);
-      showToast('Workstation slot deactivated successfully.', 'success');
-    } catch (err: any) {
-      showToast(err.message || 'Failed to deactivate workstation.', 'error');
-    }
-  };
-
-  const selectedClips = playlist
-    ? Array.from(selectedIndices)
-        .sort((a, b) => a - b)
-        .map((i) => playlist.entries[i])
-        .filter(Boolean)
-    : [];
+  }, [setPlaylist, setSelectedIndices, setProgress, setIsPaused, setOutputFile, setToast, setSearchQuery, setActiveTab]);
 
   const showActionBar = !isMerging && !outputFile && Boolean(playlist) && activeTab === 'merge';
   const effectiveIsPaused = isPaused || progress?.status === 'paused';
@@ -524,5 +442,9 @@ export function useMergeApp() {
     setFormat,
     searchQuery,
     setSearchQuery,
+    failureInfo,
+    setFailureInfo,
+    dismissFailureModal,
+    retryMerge,
   };
 }
