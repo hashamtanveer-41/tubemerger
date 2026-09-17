@@ -6,9 +6,9 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from tubemerge.apps.telemetry.service import TelemetryService
+from tubemerger.apps.telemetry.service import TelemetryService
 from fastapi.testclient import TestClient
-from tubemerge.server.app import create_app
+from tubemerger.server.app import create_app
 
 app = create_app()
 client = TestClient(app)

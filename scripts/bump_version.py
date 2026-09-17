@@ -70,16 +70,16 @@ def bump(new_version: str, dry_run: bool = False) -> None:
         f'\\1"{new_version}"',
     )
 
-    # ── src/tubemerge/__init__.py ────────────────────────────────────────
+    # ── src/tubemerger/__init__.py ───────────────────────────────────────
     _replace(
-        Path("src/tubemerge/__init__.py"),
+        Path("src/tubemerger/__init__.py"),
         r'(__version__\s*=\s*)"[\d.]+"',
         f'\\1"{new_version}"',
     )
 
-    # ── src/tubemerge/core/settings.py ──────────────────────────────────
+    # ── src/tubemerger/core/settings.py ─────────────────────────────────
     _replace(
-        Path("src/tubemerge/core/settings.py"),
+        Path("src/tubemerger/core/settings.py"),
         r'(VERSION\s*=\s*)"[\d.]+"',
         f'\\1"{new_version}"',
     )
@@ -137,14 +137,14 @@ def bump(new_version: str, dry_run: bool = False) -> None:
         changes.append((version_json_path, new_content))
         print(f"  BUMP  website/public/version.json")
 
-    # ── tubemerge.spec ───────────────────────────────────────────────────
+    # ── tubemerger.spec ──────────────────────────────────────────────────
     _replace(
-        Path("tubemerge.spec"),
+        Path("tubemerger.spec"),
         r'("CFBundleVersion":\s*)"[\d.]+"',
         f'\\1"{new_version}"',
     )
     _replace(
-        Path("tubemerge.spec"),
+        Path("tubemerger.spec"),
         r'("CFBundleShortVersionString":\s*)"[\d.]+"',
         f'\\1"{new_version}"',
     )

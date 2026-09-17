@@ -23,11 +23,11 @@ from unittest.mock import patch, MagicMock
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
-from tubemerge.core import settings
-from tubemerge.utils.process import get_clean_subprocess_env, get_hidden_subprocess_kwargs
-from tubemerge.apps.binaries.services.locator_service import BinaryLocatorService
-from tubemerge.apps.binaries.services.inspector_service import BinaryInspectorService
-from tubemerge.apps.merger.services.engine import MergeEngine, MergeJobSpec
+from tubemerger.core import settings
+from tubemerger.utils.process import get_clean_subprocess_env, get_hidden_subprocess_kwargs
+from tubemerger.apps.binaries.services.locator_service import BinaryLocatorService
+from tubemerger.apps.binaries.services.inspector_service import BinaryInspectorService
+from tubemerger.apps.merger.services.engine import MergeEngine, MergeJobSpec
 
 
 class TestProcessEnvironmentSanity(unittest.TestCase):
@@ -131,7 +131,7 @@ class TestBinaryLocatorSanity(unittest.TestCase):
     def test_find_ytdlp_never_creates_dummy_shebang_script(self):
         """find_ytdlp must NEVER create a 4-line python dummy script that relies on host site-packages."""
         with patch.object(self.locator, "which", return_value=None):
-            with patch("tubemerge.apps.binaries.services.installer_service.BinaryInstallerService.download_ytdlp", side_effect=RuntimeError("No network")):
+            with patch("tubemerger.apps.binaries.services.installer_service.BinaryInstallerService.download_ytdlp", side_effect=RuntimeError("No network")):
                 with self.assertRaises(FileNotFoundError):
                     self.locator.find_ytdlp()
 
@@ -233,7 +233,7 @@ class TestBrandingAndMetadataSanity(unittest.TestCase):
         self.assertTrue(re.match(r"^\d+\.\d+\.\d+$", settings.VERSION))
 
     def test_no_stale_tubemerge_repo_urls_in_settings(self):
-        """Ensure settings and core references point to tubemerger, not tubemerge."""
+        """Ensure settings and core references point to tubemerger, not tubemerger."""
         self.assertNotIn("hashamtanveer-41/tubemerge/", settings.DOMAIN)
 
 
@@ -254,6 +254,12 @@ class TestReleaseManifestSanity(unittest.TestCase):
         # Check that download URLs point to tubemerger
         for platform_key, url in data["assets"].items():
             self.assertTrue(url.startswith("https://github.com/hashamtanveer-41/tubemerger/releases/"), f"URL {url} should point to tubemerger repo")
+
+    def test_tubemerger_spec_exists(self):
+        spec_path = PROJECT_ROOT / "tubemerger.spec"
+        self.assertTrue(spec_path.exists(), "tubemerger.spec must exist in repository root")
+        content = spec_path.read_text(encoding="utf-8")
+        self.assertIn('name="TubeMerger"', content)
 
 
 class TestStructuredDataConsistency(unittest.TestCase):
@@ -279,7 +285,7 @@ class TestConnectivityServiceSanity(unittest.TestCase):
     """Checks that connectivity checks do not crash or block offline execution."""
 
     def test_connectivity_check_probes(self):
-        from tubemerge.apps.updates.service import check_connectivity
+        from tubemerger.apps.updates.service import check_connectivity
         # Should return a bool and never throw an unhandled exception
         result = check_connectivity(timeout=1.0)
         self.assertIsInstance(result, bool)

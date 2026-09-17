@@ -1,5 +1,7 @@
-"""TubeMerger - YouTube Playlist Merger Desktop Application."""
+"""Backward compatibility shim redirecting legacy tubemerge imports to tubemerger."""
 
-__version__ = "1.1.3"
+import sys
+import tubemerger
 
-__app_name__ = "TubeMerger"
+# Alias tubemerge module to tubemerger in sys.modules
+sys.modules[__name__] = tubemerger

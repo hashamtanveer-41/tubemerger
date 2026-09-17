@@ -42,7 +42,7 @@ if not getattr(sys, "frozen", False):
         except ImportError:
             os.execv(str(venv_python), [str(venv_python)] + sys.argv)
 
-from tubemerge.app import run
+from tubemerger.app import run
 
 if __name__ == "__main__":
     run()

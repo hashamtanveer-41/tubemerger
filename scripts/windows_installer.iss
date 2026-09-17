@@ -1,7 +1,7 @@
-; Inno Setup Script for TubeMerge (Windows 64-bit)
+; Inno Setup Script for TubeMerger (Windows 64-bit)
 
 #ifndef MyAppName
-#define MyAppName "TubeMerge"
+#define MyAppName "TubeMerger"
 #endif
 
 #ifndef MyAppVersion
@@ -10,9 +10,9 @@
 
 
 
-#define MyAppPublisher "TubeMerge Inc."
+#define MyAppPublisher "TubeMerger"
 #define MyAppURL "https://tubemerger.com"
-#define MyAppExeName "TubeMerge.exe"
+#define MyAppExeName "TubeMerger.exe"
 
 [Setup]
 AppId={{E9A6836D-9154-4C75-8D63-7182276FEF10}
@@ -25,7 +25,7 @@ AppUpdatesURL={#MyAppURL}
 DefaultDirName={autopf}\{#MyAppName}
 DisableProgramGroupPage=yes
 OutputDir=..\dist
-OutputBaseFilename=TubeMerge-Setup-v{#MyAppVersion}
+OutputBaseFilename=TubeMerger-Setup-v{#MyAppVersion}
 SetupIconFile=..\assets\logo.ico
 Compression=lzma
 SolidCompression=yes
@@ -39,7 +39,7 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Files]
-Source: "..\dist\TubeMerge\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\dist\TubeMerger\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\{#MyAppExeName}"

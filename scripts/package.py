@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""TubeMerge Desktop Packaging Pipeline.
+"""TubeMerger Desktop Packaging Pipeline.
 
 Automates the build process across Windows, macOS, and Linux:
 1. Builds React + Vite client frontend (with VITE_ENABLE_ADMIN=false)
 2. Generates icons if missing
-3. Invokes PyInstaller with tubemerge.spec
+3. Invokes PyInstaller with tubemerger.spec
 4. Verifies output bundle integrity
 """
 
@@ -59,7 +59,7 @@ def main():
 
     # 3. Execute PyInstaller
     pyinstaller_bin = shutil.which("pyinstaller") or sys.executable + " -m PyInstaller"
-    spec_file = str(ROOT_DIR / "tubemerge.spec")
+    spec_file = str(ROOT_DIR / "tubemerger.spec")
 
     if isinstance(pyinstaller_bin, str) and " " in pyinstaller_bin:
         cmd = [sys.executable, "-m", "PyInstaller", "--clean", "--noconfirm", spec_file]
@@ -69,19 +69,19 @@ def main():
     run_step("Executing PyInstaller Compilation", cmd, cwd=ROOT_DIR)
 
     # 4. Verify output
-    dist_dir = ROOT_DIR / "dist" / "TubeMerge"
+    dist_dir = ROOT_DIR / "dist" / "TubeMerger"
     if sys.platform == "darwin":
-        app_bundle = ROOT_DIR / "dist" / "TubeMerge.app"
+        app_bundle = ROOT_DIR / "dist" / "TubeMerger.app"
         if app_bundle.exists():
             print(f"\n[SUCCESS] macOS App Bundle created: {app_bundle}")
             return
     elif sys.platform.startswith("win"):
-        exe_path = dist_dir / "TubeMerge.exe"
+        exe_path = dist_dir / "TubeMerger.exe"
         if exe_path.exists():
             print(f"\n[SUCCESS] Windows Executable created: {exe_path}")
             return
     else:
-        bin_path = dist_dir / "TubeMerge"
+        bin_path = dist_dir / "TubeMerger"
         if bin_path.exists():
             print(f"\n[SUCCESS] Linux Executable created: {bin_path}")
             return

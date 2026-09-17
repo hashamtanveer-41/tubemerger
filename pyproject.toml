@@ -26,7 +26,8 @@ dependencies = [
 Homepage = "https://tubemerger.com"
 
 [project.scripts]
-tubemerge = "tubemerge.app:run"
+tubemerger = "tubemerger.app:run"
+tubemerge = "tubemerger.app:run"
 
 [tool.setuptools.packages.find]
 where = ["src"]

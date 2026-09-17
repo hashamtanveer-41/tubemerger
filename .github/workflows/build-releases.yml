@@ -82,59 +82,62 @@ jobs:
 
       - name: Build Desktop Executable with PyInstaller
         run: |
-          python -m PyInstaller --clean --noconfirm tubemerge.spec
+          python -m PyInstaller --clean --noconfirm tubemerger.spec
 
 
       # ── Platform Packaging ─────────────────────────────────────────────────
       - name: Package Windows (.zip & installer)
         if: runner.os == 'Windows'
         run: |
-          New-Item -ItemType Directory -Force -Path "dist/TubeMerge/bin"
-          Invoke-WebRequest -Uri "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe" -OutFile "dist/TubeMerge/bin/yt-dlp.exe"
+          New-Item -ItemType Directory -Force -Path "dist/TubeMerger/bin"
+          Invoke-WebRequest -Uri "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe" -OutFile "dist/TubeMerger/bin/yt-dlp.exe"
           Invoke-WebRequest -Uri "https://github.com/yt-dlp/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip" -OutFile "ffmpeg.zip"
           Expand-Archive -Path "ffmpeg.zip" -DestinationPath "ffmpeg-extracted"
-          Get-ChildItem -Path "ffmpeg-extracted" -Recurse -Filter "ffmpeg.exe" | Copy-Item -Destination "dist/TubeMerge/bin/ffmpeg.exe"
-          Get-ChildItem -Path "ffmpeg-extracted" -Recurse -Filter "ffprobe.exe" | Copy-Item -Destination "dist/TubeMerge/bin/ffprobe.exe"
+          Get-ChildItem -Path "ffmpeg-extracted" -Recurse -Filter "ffmpeg.exe" | Copy-Item -Destination "dist/TubeMerger/bin/ffmpeg.exe"
+          Get-ChildItem -Path "ffmpeg-extracted" -Recurse -Filter "ffprobe.exe" | Copy-Item -Destination "dist/TubeMerger/bin/ffprobe.exe"
           Remove-Item -Recurse -Force "ffmpeg.zip", "ffmpeg-extracted"
-          Compress-Archive -Path dist/TubeMerge/* -DestinationPath dist/${{ matrix.artifact_name }}
+          Compress-Archive -Path dist/TubeMerger/* -DestinationPath dist/${{ matrix.artifact_name }}
           if (Test-Path "C:\Program Files (x86)\Inno Setup 6\iscc.exe") {
             $tag = "${{ github.ref_name }}"
             $ver = if ($tag.StartsWith("v")) { $tag.Substring(1) } else { "1.0.5" }
             & "C:\Program Files (x86)\Inno Setup 6\iscc.exe" /DMyAppVersion=$ver scripts/windows_installer.iss
-            # Copy to canonical TubeMerge-Setup.exe so website download URL stays evergreen
-            Copy-Item -Path "dist\TubeMerge-Setup-v*.exe" -Destination "dist\TubeMerge-Setup.exe" -Force
+            # Copy to canonical TubeMerger-Setup.exe and TubeMerge-Setup.exe so website download URL stays evergreen
+            Copy-Item -Path "dist\TubeMerger-Setup-v*.exe" -Destination "dist\TubeMerger-Setup.exe" -Force
+            Copy-Item -Path "dist\TubeMerger-Setup-v*.exe" -Destination "dist\TubeMerge-Setup.exe" -Force
           }
 
       - name: Package macOS (.app / .zip)
         if: runner.os == 'macOS'
         run: |
-          mkdir -p dist/TubeMerge.app/Contents/MacOS/bin
+          mkdir -p dist/TubeMerger.app/Contents/MacOS/bin
           arch=$(uname -m)
           tag="arm64"
           if [ "$arch" != "arm64" ]; then
             tag="x64"
           fi
-          curl -L "https://github.com/eugeneware/ffmpeg-static/releases/download/b6.1.1/ffmpeg-darwin-${tag}" -o dist/TubeMerge.app/Contents/MacOS/bin/ffmpeg
-          curl -L "https://github.com/eugeneware/ffmpeg-static/releases/download/b6.1.1/ffprobe-darwin-${tag}" -o dist/TubeMerge.app/Contents/MacOS/bin/ffprobe
-          curl -L "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_macos" -o dist/TubeMerge.app/Contents/MacOS/bin/yt-dlp
-          chmod +x dist/TubeMerge.app/Contents/MacOS/bin/*
-          xattr -cr dist/TubeMerge.app || true
+          curl -L "https://github.com/eugeneware/ffmpeg-static/releases/download/b6.1.1/ffmpeg-darwin-${tag}" -o dist/TubeMerger.app/Contents/MacOS/bin/ffmpeg
+          curl -L "https://github.com/eugeneware/ffmpeg-static/releases/download/b6.1.1/ffprobe-darwin-${tag}" -o dist/TubeMerger.app/Contents/MacOS/bin/ffprobe
+          curl -L "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_macos" -o dist/TubeMerger.app/Contents/MacOS/bin/yt-dlp
+          chmod +x dist/TubeMerger.app/Contents/MacOS/bin/*
+          xattr -cr dist/TubeMerger.app || true
           cd dist
-          zip -r ${{ matrix.artifact_name }} TubeMerge.app
-          cp ${{ matrix.artifact_name }} TubeMerge-macOS.zip
-          cp ${{ matrix.artifact_name }} TubeMerge-macOS-x64.zip
+          zip -r ${{ matrix.artifact_name }} TubeMerger.app
+          cp ${{ matrix.artifact_name }} TubeMerger-macOS.zip
+          cp ${{ matrix.artifact_name }} TubeMerger-macOS-x64.zip
+          cp ${{ matrix.artifact_name }} TubeMerge-macOS.zip || true
+          cp ${{ matrix.artifact_name }} TubeMerge-macOS-x64.zip || true
 
 
       - name: Package Linux (.tar.gz)
         if: runner.os == 'Linux'
         run: |
-          mkdir -p dist/TubeMerge/bin
-          curl -L "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp" -o dist/TubeMerge/bin/yt-dlp
-          chmod +x dist/TubeMerge/bin/*
-          cp assets/tubemerger.desktop dist/TubeMerge/
-          cp assets/logo.png dist/TubeMerge/tubemerger.png
+          mkdir -p dist/TubeMerger/bin
+          curl -L "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp" -o dist/TubeMerger/bin/yt-dlp
+          chmod +x dist/TubeMerger/bin/*
+          cp assets/tubemerger.desktop dist/TubeMerger/
+          cp assets/logo.png dist/TubeMerger/tubemerger.png
           cd dist
-          tar -czvf ${{ matrix.artifact_name }} TubeMerge/
+          tar -czvf ${{ matrix.artifact_name }} TubeMerger/
 
 
       - name: Upload Build Artifact

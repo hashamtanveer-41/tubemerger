@@ -7,13 +7,13 @@ from unittest.mock import patch, MagicMock
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from tubemerge.core import settings
-from tubemerge.apps.binaries.services import BinaryService
-from tubemerge.apps.playlists.models import VideoClip, Playlist
-from tubemerge.apps.playlists.services import PlaylistMetadataService
-from tubemerge.apps.merger.services.normalizer import VideoNormalizerService
-from tubemerge.apps.merger.services.stitcher import VideoStitcherService
-from tubemerge.apps.merger.models import PipelineStatus
+from tubemerger.core import settings
+from tubemerger.apps.binaries.services import BinaryService
+from tubemerger.apps.playlists.models import VideoClip, Playlist
+from tubemerger.apps.playlists.services import PlaylistMetadataService
+from tubemerger.apps.merger.services.normalizer import VideoNormalizerService
+from tubemerger.apps.merger.services.stitcher import VideoStitcherService
+from tubemerger.apps.merger.models import PipelineStatus
 
 class TestDomainModels(unittest.TestCase):
     def test_video_clip_duration_formatted(self):
@@ -66,7 +66,7 @@ class TestStitcherService(unittest.TestCase):
         path = Path("/tmp/dir with space/video's.mp4")
         line = VideoStitcherService.write_manifest
         # Check escape logic directly
-        from tubemerge.utils.file_system import escape_posix_path
+        from tubemerger.utils.file_system import escape_posix_path
         res = escape_posix_path(path)
         self.assertTrue(res.startswith("file '"))
         self.assertIn(r"'\''", res)
@@ -79,14 +79,14 @@ class TestMetadataUrlSanitization(unittest.TestCase):
 
 class TestTelemetryService(unittest.TestCase):
     def test_telemetry_payload_structure(self):
-        from tubemerge.apps.telemetry.service import TelemetryService, _SYSTEM_PROPS, _SESSION_ID
+        from tubemerger.apps.telemetry.service import TelemetryService, _SYSTEM_PROPS, _SESSION_ID
         self.assertIn("osName", _SYSTEM_PROPS)
         self.assertIn("sdkVersion", _SYSTEM_PROPS)
         self.assertTrue(len(_SESSION_ID) > 8)
 
 class TestFOSSController(unittest.TestCase):
     def test_merge_job_spec(self):
-        from tubemerge.apps.merger.services.engine import MergeJobSpec
+        from tubemerger.apps.merger.services.engine import MergeJobSpec
         spec = MergeJobSpec(
             playlist_url="https://youtube.com/playlist?list=test",
             selected_indices=[0, 1],
@@ -98,7 +98,7 @@ class TestFOSSController(unittest.TestCase):
 class TestProcessUtils(unittest.TestCase):
     def test_clean_subprocess_env_removes_ld_library_path(self):
         import os
-        from tubemerge.utils.process import get_clean_subprocess_env, get_hidden_subprocess_kwargs
+        from tubemerger.utils.process import get_clean_subprocess_env, get_hidden_subprocess_kwargs
         with patch.dict(os.environ, {"LD_LIBRARY_PATH": "/some/internal/path"}, clear=False):
             if "LD_LIBRARY_PATH_ORIG" in os.environ:
                 del os.environ["LD_LIBRARY_PATH_ORIG"]
@@ -107,7 +107,7 @@ class TestProcessUtils(unittest.TestCase):
 
     def test_clean_subprocess_env_restores_ld_library_path_orig(self):
         import os
-        from tubemerge.utils.process import get_clean_subprocess_env
+        from tubemerger.utils.process import get_clean_subprocess_env
         with patch.dict(os.environ, {"LD_LIBRARY_PATH": "/internal", "LD_LIBRARY_PATH_ORIG": "/orig/lib"}, clear=False):
             env = get_clean_subprocess_env()
             self.assertEqual(env.get("LD_LIBRARY_PATH"), "/orig/lib")
@@ -115,7 +115,7 @@ class TestProcessUtils(unittest.TestCase):
 
 class TestPauseResume(unittest.TestCase):
     def test_engine_pause_and_resume(self):
-        from tubemerge.apps.merger.services.engine import MergeEngine, MergeJobSpec, ProgressSnapshot, PipelineStatus
+        from tubemerger.apps.merger.services.engine import MergeEngine, MergeJobSpec, ProgressSnapshot, PipelineStatus
         emitted = []
         spec = MergeJobSpec(
             playlist_url="https://youtube.com/playlist?list=test",
@@ -159,14 +159,14 @@ class TestPauseResume(unittest.TestCase):
 
 class TestErrorDiagnostics(unittest.TestCase):
     def test_mashed_multiple_urls(self):
-        from tubemerge.apps.playlists.services import diagnose_extraction_error
+        from tubemerger.apps.playlists.services import diagnose_extraction_error
         url = "https://www.youtube.com/playlist?list=PLX9BFXyidv0Mhttps://music.youtube.com/playlist?list=RDCLAK5uy_nmS3YoxSwVVQk9IE"
         diag = diagnose_extraction_error(url, "")
         self.assertEqual(diag.title, "Multiple Links Detected")
         self.assertIn("Multiple URLs were detected", diag.message)
 
     def test_http_400_bad_request_diagnosis(self):
-        from tubemerge.apps.playlists.services import diagnose_extraction_error
+        from tubemerger.apps.playlists.services import diagnose_extraction_error
         err = "[youtube:tab] PLX9BFXyidv0Mhttps:: Unable to download API page: HTTP Error 400: Bad Request (caused by <HTTPError 400: Bad Request>)"
         diag = diagnose_extraction_error("https://youtube.com/playlist?list=bad", err)
         self.assertEqual(diag.title, "Invalid Link Parameter")
@@ -175,7 +175,7 @@ class TestErrorDiagnostics(unittest.TestCase):
         self.assertNotIn("HTTPError", diag.message)
 
     def test_sanitization_removes_raw_ytdlp_syntax(self):
-        from tubemerge.apps.playlists.services import diagnose_extraction_error
+        from tubemerger.apps.playlists.services import diagnose_extraction_error
         err = "ERROR: [generic] SomeCustomError:: Some stream failure (caused by <CustomException>)"
         diag = diagnose_extraction_error("https://youtube.com/watch?v=123", err)
         self.assertNotIn("ERROR:", diag.message)
@@ -186,10 +186,10 @@ class TestErrorDiagnostics(unittest.TestCase):
 class TestSystemSettings(unittest.TestCase):
     def test_settings_persistence(self):
         import tempfile
-        from tubemerge.apps.system.services import SystemService
+        from tubemerger.apps.system.services import SystemService
         with tempfile.TemporaryDirectory() as tmpdir:
             test_file = Path(tmpdir) / "settings.json"
-            with patch("tubemerge.core.settings.SETTINGS_FILE", test_file):
+            with patch("tubemerger.core.settings.SETTINGS_FILE", test_file):
                 # Initial default
                 init = SystemService.get_settings()
                 self.assertFalse(init.get("tour_completed", False))
