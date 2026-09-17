@@ -9,10 +9,10 @@ from typing import Dict, Any
 # ---------------------------------------------------------------------------
 # Application Branding & Identity
 # ---------------------------------------------------------------------------
-APP_NAME = "TubeMerge"
+APP_NAME = "TubeMerger"
 APP_TAGLINE = "YouTube Playlist Merger"
 DOMAIN = "tubemerger.com"
-VERSION = "1.1.2"
+VERSION = "1.1.3"
 
 
 

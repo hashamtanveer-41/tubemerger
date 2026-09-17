@@ -60,7 +60,12 @@ def launch_desktop_window() -> None:
                             gi.require_version("Soup", "2.4")
                         except ValueError:
                             pass
-                    from gi.repository import Gtk
+                    from gi.repository import Gtk, GLib
+                    try:
+                        GLib.set_prgname("TubeMerger")
+                        GLib.set_application_name("TubeMerger")
+                    except Exception:
+                        pass
                     icon_file = str(settings.PROJECT_ROOT / "assets" / "logo.png")
                     if os.path.exists(icon_file):
                         Gtk.Window.set_default_icon_from_file(icon_file)
@@ -143,7 +148,7 @@ def launch_desktop_window() -> None:
                                 bin_path,
                                 f"--app={url}",
                                 "--window-size=1280,820",
-                                "--class=TubeMerge",
+                                "--class=TubeMerger",
                             ], env=clean_env)
                             launched_gui = True
                             print(f"Launched standalone desktop app window via {bin_name}.")
@@ -153,7 +158,7 @@ def launch_desktop_window() -> None:
 
     # 3. Tertiary fallback: System browser redirection
     if not launched_gui:
-        print(f"TubeMerge is running at {settings.SERVER_URL}")
+        print(f"TubeMerger is running at {settings.SERVER_URL}")
         try:
             webbrowser.open(url)
         except Exception:
@@ -161,7 +166,7 @@ def launch_desktop_window() -> None:
 
     try:
         if sys.stdin and hasattr(sys.stdin, "isatty") and sys.stdin.isatty():
-            input("[Press Enter or Ctrl+C to stop TubeMerge]\n")
+            input("[Press Enter or Ctrl+C to stop TubeMerger]\n")
         else:
             while True:
                 time.sleep(1)

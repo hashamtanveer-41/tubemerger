@@ -1,5 +1,5 @@
-"""TubeMerge - YouTube Playlist Merger Desktop Application."""
+"""TubeMerger - YouTube Playlist Merger Desktop Application."""
 
-__version__ = "1.1.2"
+__version__ = "1.1.3"
 
-__app_name__ = "TubeMerge"
+__app_name__ = "TubeMerger"

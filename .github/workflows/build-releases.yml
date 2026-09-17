@@ -131,6 +131,8 @@ jobs:
           mkdir -p dist/TubeMerge/bin
           curl -L "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp" -o dist/TubeMerge/bin/yt-dlp
           chmod +x dist/TubeMerge/bin/*
+          cp assets/tubemerger.desktop dist/TubeMerge/
+          cp assets/logo.png dist/TubeMerge/tubemerger.png
           cd dist
           tar -czvf ${{ matrix.artifact_name }} TubeMerge/
 

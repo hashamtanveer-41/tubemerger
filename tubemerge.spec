@@ -280,11 +280,11 @@ if sys.platform == "darwin":
         info_plist={
             "NSHighResolutionCapable": True,
             "LSBackgroundOnly": False,
-            "CFBundleName": "TubeMerge",
-            "CFBundleDisplayName": "TubeMerge",
+            "CFBundleName": "TubeMerger",
+            "CFBundleDisplayName": "TubeMerger",
             "CFBundleIdentifier": "com.tubemerger.desktop",
             "CFBundleVersion": "1.1.0",
-            "CFBundleShortVersionString": "1.1.2",
+            "CFBundleShortVersionString": "1.1.3",
 
             "NSDownloadsFolderUsageDescription": "TubeMerger needs access to save downloaded videos to your Downloads folder.",
             "NSDesktopFolderUsageDescription": "TubeMerger needs access to save downloaded videos to your Desktop.",

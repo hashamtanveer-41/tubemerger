@@ -88,6 +88,6 @@ def setup_desktop_environment() -> None:
     if sys.platform == "win32":
         try:
             import ctypes
-            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("TubeMerge.Desktop.App")
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("TubeMerger.Desktop.App")
         except Exception:
             pass

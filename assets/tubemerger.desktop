@@ -1,0 +1,13 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=TubeMerger
+GenericName=YouTube Playlist Merger & Downloader
+Comment=Merge YouTube playlists into seamless videos with chapters, download 4K videos, and extract 320kbps MP3s
+Exec=TubeMerge %u
+Icon=tubemerger
+Terminal=false
+Categories=AudioVideo;Video;Audio;Network;
+StartupWMClass=TubeMerger
+MimeType=x-scheme-handler/tubemerger;
+Keywords=youtube;downloader;merger;playlist;video;mp3;
