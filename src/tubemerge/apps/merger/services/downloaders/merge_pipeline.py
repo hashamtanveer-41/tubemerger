@@ -70,6 +70,9 @@ class MergePipeline:
         total_videos = len(selected_entries)
         raw_files: List[Tuple] = []
         last_merge_err = ""
+        consecutive_failures = 0
+        circuit_breaker_limit = 3
+        archive_file = temp_dir / ".tubemerge_archive.txt"
 
         # 2. Download phase
         for idx, clip in enumerate(selected_entries, start=1):
@@ -77,6 +80,28 @@ class MergePipeline:
             if self._is_cancelled():
                 self._emit(ProgressSnapshot(status=PipelineStatus.CANCELLED, message="Cancelled."))
                 return
+
+            # Idempotency Check: if raw clip already exists in temp_dir, skip downloading
+            existing_candidates = [
+                p for p in temp_dir.glob(f"raw_{idx:04d}.*")
+                if not p.name.endswith((".part", ".ytdl"))
+                and (not is_audio or p.name.endswith(".mp3"))
+                and p.stat().st_size > 1024
+            ]
+            if existing_candidates:
+                logger.info("Clip %d already in temp cache (%s), skipping.", idx, existing_candidates[0].name)
+                raw_files.append((clip, existing_candidates[0]))
+                consecutive_failures = 0
+                pct = 5.0 + (idx / total_videos) * 40.0
+                self._emit(ProgressSnapshot(
+                    status=PipelineStatus.DOWNLOADING,
+                    current_item=idx,
+                    total_items=total_videos,
+                    current_video_title=clip.title,
+                    overall_percent=round(pct, 1),
+                    message=f"Verified ({idx}/{total_videos}): {clip.title} (cached)",
+                ))
+                continue
 
             pct = 5.0 + (idx / total_videos) * 40.0
             self._emit(ProgressSnapshot(
@@ -98,6 +123,7 @@ class MergePipeline:
                 quality=job_spec.quality or job_spec.canvas_preset,
                 audio_bitrate=getattr(job_spec, "audio_bitrate", None),
                 is_batch=True,
+                archive_path=archive_file,
             )
 
             def _merge_dl_progress(clip_pct: float, spd: str):
@@ -145,9 +171,23 @@ class MergePipeline:
                             break
 
             if rc != 0:
+                consecutive_failures += 1
                 last_merge_err = (stderr_out or "").strip()
-                logger.warning("Download failed for %s: %s", clip.title, last_merge_err[:200])
+                logger.warning(
+                    "Download failed for %s (%d consecutive fails): %s",
+                    clip.title, consecutive_failures, last_merge_err[:200]
+                )
+
+                # Fast-Fail Circuit Breaker: Halt early if YouTube is blocking at the start
+                if consecutive_failures >= circuit_breaker_limit and len(raw_files) == 0:
+                    err_sub = categorize_ytdlp_error(last_merge_err)
+                    raise RuntimeError(
+                        f"YouTube rate limit detected (circuit breaker tripped after {consecutive_failures} consecutive failures). "
+                        f"Stopped early to protect your connection ({err_sub}): {last_merge_err[:200]}"
+                    )
                 continue
+            else:
+                consecutive_failures = 0
 
             candidates = [
                 p for p in temp_dir.glob(f"raw_{idx:04d}.*")

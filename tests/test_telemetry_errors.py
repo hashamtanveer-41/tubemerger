@@ -63,6 +63,23 @@ class TestErrorCategorization(unittest.TestCase):
         self.assertEqual(subtype, "disk_full")
         self.assertFalse(TelemetryService.is_resolvable_error(subtype))
 
+    def test_circuit_breaker_categorization(self):
+        err = "Circuit breaker tripped: YouTube blocked 3 consecutive clip downloads."
+        subtype = TelemetryService.categorize_ytdlp_error(err)
+        self.assertEqual(subtype, "circuit_breaker_rate_limit")
+        self.assertTrue(TelemetryService.is_resolvable_error(subtype))
+
+    def test_all_downloads_failed_categorization(self):
+        err = "No files could be downloaded from this playlist. Check network connection or yt-dlp version."
+        subtype = TelemetryService.categorize_ytdlp_error(err)
+        self.assertEqual(subtype, "all_downloads_failed")
+        self.assertTrue(TelemetryService.is_resolvable_error(subtype))
+
+    def test_format_not_available_categorization(self):
+        err = "ERROR: Requested format is not available for this video."
+        subtype = TelemetryService.categorize_ytdlp_error(err)
+        self.assertEqual(subtype, "format_not_available")
+
     def test_size_bucketing(self):
         self.assertEqual(TelemetryService._bucket_size(50), "<100MB")
         self.assertEqual(TelemetryService._bucket_size(350), "100-500MB")

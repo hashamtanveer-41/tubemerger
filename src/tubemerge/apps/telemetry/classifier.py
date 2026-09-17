@@ -26,6 +26,10 @@ def categorize_ytdlp_error(error_message: str) -> str:
         return "video_unavailable"
     elif "network is unreachable" in msg or "timed out" in msg or "socket timeout" in msg or "connection reset" in msg or "name or service not known" in msg or "remote end closed connection" in msg:
         return "network_timeout"
+    elif "circuit breaker" in msg or "circuit breaker tripped" in msg:
+        return "circuit_breaker_rate_limit"
+    elif "no files could be downloaded" in msg or "no files were successfully downloaded" in msg:
+        return "all_downloads_failed"
     elif "no space left on device" in msg or "disk full" in msg:
         return "disk_full"
     elif "permission denied" in msg or "access is denied" in msg:
@@ -44,5 +48,7 @@ def is_resolvable_error(error_subtype: str) -> bool:
         "rate_limited_429",
         "network_timeout",
         "bot_detection",
+        "circuit_breaker_rate_limit",
+        "all_downloads_failed",
         "other_unknown",
     ) or error_subtype.startswith("other_")

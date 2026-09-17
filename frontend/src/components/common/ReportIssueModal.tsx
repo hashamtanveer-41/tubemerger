@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { FailureInfo } from '@/types';
 import { api } from '@/services/api';
+import packageJson from '../../../package.json';
 
 const GITHUB_REPO = 'hashamtanveer-41/tubemerger';
 
@@ -110,6 +111,24 @@ function getSubtypeMetadata(subtype: string): SubtypeMetadata {
         recommendedAction:
           'Deselect this clip from the list to download the rest of the playlist.',
       };
+    case 'circuit_breaker_rate_limit':
+      return {
+        title: 'Connection Protection Activated',
+        badge: 'Circuit Breaker Tripped',
+        explanation:
+          'YouTube blocked multiple consecutive download attempts. TubeMerger stopped early to protect your connection and automatically scheduled a core engine update.',
+        recommendedAction:
+          'Wait 30-60 seconds and click Retry. Download progress is saved and completed clips will be skipped.',
+      };
+    case 'all_downloads_failed':
+      return {
+        title: 'Playlist Downloads Interrupted',
+        badge: 'Downloads Failed',
+        explanation:
+          'None of the requested clips could be retrieved due to YouTube stream encryption or network rate limiting. An automated background engine refresh has been initiated.',
+        recommendedAction:
+          'Wait 30-60 seconds for the engine to refresh, then click Retry Download.',
+      };
     case 'disk_full':
       return {
         title: 'Disk Storage Full',
@@ -177,7 +196,7 @@ export function ReportIssueModal({
   const buildDiagnosticLog = (): string => {
     return [
       '### TubeMerger Diagnostic Report',
-      `- **App Version**: 1.1.0`,
+      `- **App Version**: ${packageJson.version}`,
       `- **Platform**: ${platform}`,
       `- **Subtype**: \`${failureInfo.errorSubtype}\``,
       `- **Is Resolvable**: ${failureInfo.isResolvable ? 'Yes (Transient)' : 'No (Permanent restriction)'}`,
@@ -307,7 +326,7 @@ export function ReportIssueModal({
               <span className="text-[#777777] block text-[10px] uppercase font-semibold tracking-wider mb-0.5">
                 Version & OS
               </span>
-              <span className="text-white font-bold truncate block">v1.1.0 · {platform}</span>
+              <span className="text-white font-bold truncate block">v{packageJson.version} · {platform}</span>
             </div>
           </div>
 

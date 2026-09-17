@@ -1,18 +1,50 @@
 import os
 import sys
+import time
 import stat
 import platform
 import tarfile
 import zipfile
+import threading
+import logging
 import urllib.request
 from pathlib import Path
 from typing import Optional, Tuple
 from tubemerge.core import settings
 
+logger = logging.getLogger(__name__)
+
+_UPDATING_LOCK = threading.Lock()
+_LAST_UPDATE_TIME = 0.0
+
 class BinaryInstallerService:
     def __init__(self, binaries_dir: Optional[Path] = None):
         self.binaries_dir = binaries_dir or settings.BINARIES_DIR
         self.binaries_dir.mkdir(parents=True, exist_ok=True)
+
+    @classmethod
+    def trigger_background_ytdlp_update(cls) -> None:
+        """Spawn background daemon thread to fetch latest yt-dlp binary if not already running."""
+        def _bg_update():
+            global _LAST_UPDATE_TIME
+            if not _UPDATING_LOCK.acquire(blocking=False):
+                return
+            try:
+                now = time.time()
+                if now - _LAST_UPDATE_TIME < 300:  # 5-minute cooldown
+                    return
+                logger.info("Triggering self-healing yt-dlp background update from GitHub...")
+                installer = cls()
+                installer.download_ytdlp()
+                _LAST_UPDATE_TIME = now
+                logger.info("Self-healing yt-dlp update completed successfully.")
+            except Exception as e:
+                logger.warning("Background yt-dlp update attempt failed: %s", e)
+            finally:
+                _UPDATING_LOCK.release()
+
+        t = threading.Thread(target=_bg_update, daemon=True)
+        t.start()
 
     def download_ytdlp(self) -> str:
         if sys.platform == "win32":
@@ -25,15 +57,18 @@ class BinaryInstallerService:
             url = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp"
             dest = self.binaries_dir / "yt-dlp"
 
-        urllib.request.urlretrieve(url, dest)
+        # Download to a temporary file first then atomically replace to avoid corrupting running processes
+        temp_dest = dest.with_suffix(dest.suffix + ".tmp")
+        urllib.request.urlretrieve(url, temp_dest)
         if sys.platform != "win32":
-            dest.chmod(dest.stat().st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
+            temp_dest.chmod(temp_dest.stat().st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
         if sys.platform == "darwin":
             try:
                 import subprocess
-                subprocess.run(["xattr", "-d", "com.apple.quarantine", str(dest)], capture_output=True)
+                subprocess.run(["xattr", "-d", "com.apple.quarantine", str(temp_dest)], capture_output=True)
             except Exception:
                 pass
+        temp_dest.replace(dest)
         return str(dest)
 
     def download_ffmpeg(self) -> Tuple[str, str]:

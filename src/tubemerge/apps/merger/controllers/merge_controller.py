@@ -107,6 +107,12 @@ class MergeController:
                         selected_preset=preset,
                         playlist_size_mb=job_spec.estimated_size_mb,
                     )
+                    if err_sub in ("bot_detection", "circuit_breaker_rate_limit", "all_downloads_failed", "format_not_available"):
+                        try:
+                            from tubemerge.apps.binaries.services.installer_service import BinaryInstallerService
+                            BinaryInstallerService.trigger_background_ytdlp_update()
+                        except Exception:
+                            pass
                 elif snapshot.status == PipelineStatus.CANCELLED:
                     TelemetryService.track_job_cancelled()
 
@@ -138,7 +144,8 @@ class MergeController:
                 while True:
                     try:
                         snapshot: ProgressSnapshot = await asyncio.wait_for(q.get(), timeout=15.0)
-                        from tubemerge.apps.telemetry.service import categorize_ytdlp_error
+                        from tubemerge.apps.telemetry.service import categorize_ytdlp_error, is_resolvable_error
+                        err_sub = getattr(snapshot, "error_subtype", None) or (categorize_ytdlp_error(str(snapshot.error or "")) if snapshot.error else None)
                         data = {
                             "status": snapshot.status.value
                                 if hasattr(snapshot.status, "value") else snapshot.status,
@@ -150,8 +157,8 @@ class MergeController:
                             "speed": getattr(snapshot, "speed", None),
                             "output_file": snapshot.output_file,
                             "error": snapshot.error,
-                            "error_subtype": getattr(snapshot, "error_subtype", None) or (categorize_ytdlp_error(str(snapshot.error or "")) if snapshot.error else None),
-                            "is_resolvable": getattr(snapshot, "is_resolvable", False),
+                            "error_subtype": err_sub,
+                            "is_resolvable": getattr(snapshot, "is_resolvable", False) or (is_resolvable_error(err_sub) if err_sub else False),
                         }
                         yield f"data: {json.dumps(data)}\n\n"
                         terminal = (

@@ -1,6 +1,9 @@
 """CLI argument and format string builder for yt-dlp executions."""
 
+from pathlib import Path
 from typing import List, Optional
+
+from tubemerge.core import settings
 
 
 def get_ytdlp_format_filter(quality: str) -> str:
@@ -43,8 +46,26 @@ def build_download_command(
     quality: Optional[str] = None,
     audio_bitrate: Optional[str] = None,
     is_batch: bool = False,
+    archive_path: Optional[Path] = None,
 ) -> List[str]:
     """Construct complete command-line argument list for yt-dlp download."""
+    cache_dir = str(settings.APP_DATA_DIR / "ytdlp_cache")
+
+    common_flags = [
+        "--no-playlist",
+        "--no-warnings",
+        "--newline",
+        "--ignore-errors",
+        "--socket-timeout", "30",
+        "--retries", "3",
+        "--fragment-retries", "5",
+        "--extractor-args", "youtube:player_client=android,web",
+        "--cache-dir", cache_dir,
+    ]
+
+    if archive_path:
+        common_flags.extend(["--download-archive", str(archive_path)])
+
     if is_audio:
         cmd = [
             ytdlp_path,
@@ -53,28 +74,14 @@ def build_download_command(
             "--audio-format", "mp3",
             "--audio-quality", get_audio_quality_flag(quality or audio_bitrate),
             "-o", out_template,
-            "--no-playlist",
-            "--no-warnings",
-            "--newline",
-            "--ignore-errors",
-            "--socket-timeout", "30",
-            "--retries", "3",
-            "--fragment-retries", "5",
-        ]
+        ] + common_flags
     else:
         cmd = [
             ytdlp_path,
             "--ffmpeg-location", ffmpeg_path,
             "-f", get_ytdlp_format_filter(quality or ""),
             "-o", out_template,
-            "--no-playlist",
-            "--no-warnings",
-            "--newline",
-            "--ignore-errors",
-            "--socket-timeout", "30",
-            "--retries", "3",
-            "--fragment-retries", "5",
-        ]
+        ] + common_flags
 
     if is_batch:
         cmd.extend(["--sleep-interval", "1", "--max-sleep-interval", "2"])

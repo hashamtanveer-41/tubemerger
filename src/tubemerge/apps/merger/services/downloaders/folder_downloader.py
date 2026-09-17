@@ -63,12 +63,44 @@ class FolderDownloader:
         downloaded_files: List[Path] = []
         durations: List[float] = []
         last_folder_err = ""
+        consecutive_failures = 0
+        circuit_breaker_limit = 3
+        archive_file = target_folder / ".tubemerge_archive.txt"
 
         for idx, clip in enumerate(selected_entries, start=1):
             self._check_pause()
             if self._is_cancelled():
                 self._emit(ProgressSnapshot(status=PipelineStatus.CANCELLED, message="Cancelled."))
                 return
+
+            clean_clip_title = "".join(
+                c for c in clip.title if c.isalnum() or c in " _-"
+            ).strip()
+            if not clean_clip_title:
+                clean_clip_title = f"track_{idx:02d}" if is_audio else f"video_{idx:02d}"
+
+            # Idempotency Check: if output file already exists with non-zero size, skip downloading
+            existing_candidates = [
+                p for p in target_folder.glob(f"{idx:02d} - {clean_clip_title}.*")
+                if not p.name.endswith((".part", ".ytdl"))
+                and (not is_audio or p.name.endswith(".mp3"))
+                and p.stat().st_size > 1024
+            ]
+            if existing_candidates:
+                logger.info("Clip %d already exists on disk (%s), skipping.", idx, existing_candidates[0].name)
+                downloaded_files.append(existing_candidates[0])
+                durations.append(float(clip.duration_seconds or 0))
+                consecutive_failures = 0
+                pct = (idx / total_videos) * 98.0
+                self._emit(ProgressSnapshot(
+                    status=PipelineStatus.DOWNLOADING,
+                    current_item=idx,
+                    total_items=total_videos,
+                    current_video_title=clip.title,
+                    overall_percent=round(pct, 1),
+                    message=f"Verified ({idx}/{total_videos}): {clip.title} (already downloaded)",
+                ))
+                continue
 
             pct = (idx / total_videos) * 98.0
             self._emit(ProgressSnapshot(
@@ -80,12 +112,6 @@ class FolderDownloader:
                 message=f"Downloading ({idx}/{total_videos}): {clip.title}",
             ))
 
-            clean_clip_title = "".join(
-                c for c in clip.title if c.isalnum() or c in " _-"
-            ).strip()
-            if not clean_clip_title:
-                clean_clip_title = f"track_{idx:02d}" if is_audio else f"video_{idx:02d}"
-
             out_template = str(target_folder / f"{idx:02d} - {clean_clip_title}.%(ext)s")
             dl_cmd = build_download_command(
                 ytdlp_path=self.ytdlp_path,
@@ -96,6 +122,7 @@ class FolderDownloader:
                 quality=quality,
                 audio_bitrate=audio_bitrate,
                 is_batch=True,
+                archive_path=archive_file,
             )
 
             def _folder_progress(clip_pct: float, spd: str):
@@ -143,9 +170,23 @@ class FolderDownloader:
                             break
 
             if rc != 0:
+                consecutive_failures += 1
                 last_folder_err = (stderr_out or "").strip()
-                logger.warning("Download failed for %s: %s", clip.title, last_folder_err[:200])
+                logger.warning(
+                    "Download failed for %s (%d consecutive fails): %s",
+                    clip.title, consecutive_failures, last_folder_err[:200]
+                )
+
+                # Fast-Fail Circuit Breaker: Halt early if YouTube is blocking at the start
+                if consecutive_failures >= circuit_breaker_limit and len(downloaded_files) == 0:
+                    err_sub = categorize_ytdlp_error(last_folder_err)
+                    raise RuntimeError(
+                        f"YouTube rate limit detected (circuit breaker tripped after {consecutive_failures} consecutive failures). "
+                        f"Stopped early to protect your connection ({err_sub}): {last_folder_err[:200]}"
+                    )
                 continue
+            else:
+                consecutive_failures = 0
 
             candidates = [
                 p for p in target_folder.glob(f"{idx:02d} - {clean_clip_title}.*")
@@ -176,9 +217,14 @@ class FolderDownloader:
         except Exception:
             pass
 
+        if len(downloaded_files) < total_videos:
+            msg = f"Downloaded {len(downloaded_files)} of {total_videos} files to folder (remaining clips were rate-limited or skipped)."
+        else:
+            msg = f"Downloaded {len(downloaded_files)} files to: {target_folder}"
+
         self._emit(ProgressSnapshot(
             status=PipelineStatus.DONE,
             overall_percent=100.0,
-            message=f"Downloaded {len(downloaded_files)} files to: {target_folder}",
+            message=msg,
             output_file=str(target_folder),
         ))
