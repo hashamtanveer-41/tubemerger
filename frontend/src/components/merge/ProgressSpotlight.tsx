@@ -82,6 +82,20 @@ export function ProgressSpotlight({
     return () => cancelAnimationFrame(animationFrameId);
   }, [progress.overall_percent]);
 
+  const getStatusTitle = () => {
+    if (isPaused) {
+      if (progress.status === 'normalizing') return 'Normalizing Paused';
+      if (progress.status === 'stitching') return 'Stitching Paused';
+      if (progress.status === 'embedding_chapters') return 'Finalizing Paused';
+      return 'Download Paused';
+    }
+    if (progress.status === 'normalizing') return 'Normalizing…';
+    if (progress.status === 'stitching') return 'Stitching…';
+    if (progress.status === 'embedding_chapters') return 'Finalizing…';
+    if (progress.status === 'done') return 'Completed';
+    return 'Downloading…';
+  };
+
   return (
     <Card className="p-6 space-y-6 border-stroke-card bg-theme-surface select-none shadow-2xl max-w-4xl mx-auto">
       {/* Top Header */}
@@ -95,7 +109,7 @@ export function ProgressSpotlight({
             <Spinner size="md" variant="red" />
           )}
           <h2 className="text-base font-semibold text-content-primary leading-tight">
-            {isPaused ? 'Download Paused' : 'Download in Progress'}
+            {getStatusTitle()}
           </h2>
         </div>
 
@@ -115,7 +129,8 @@ export function ProgressSpotlight({
               variant="outline"
               size="sm"
               onClick={onPause}
-              className="text-xs border-[#333333] hover:border-[#555555] active:border-brand-red text-content-secondary hover:text-white hover:bg-[#1E1E1E] group cursor-pointer"
+              disabled={progress.status === 'normalizing' || progress.status === 'stitching' || progress.status === 'embedding_chapters'}
+              className="text-xs border-[#333333] hover:border-[#555555] active:border-brand-red text-content-secondary hover:text-white hover:bg-[#1E1E1E] group cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <Pause className="w-3.5 h-3.5 mr-1.5 text-white fill-white group-hover:text-white group-active:text-brand-red group-active:fill-brand-red transition-colors" />
               <span>Pause</span>
@@ -153,7 +168,7 @@ export function ProgressSpotlight({
             {isPaused ? (
               <>
                 <span className="text-[11px] font-semibold text-brand-red bg-black border border-brand-red/40 px-2.5 py-0.5 rounded-full flex items-center gap-1 shadow-md shadow-black/80 animate-in fade-in duration-150">
-                  <Pause className="w-3 h-3 text-brand-red fill-brand-red" />
+                  <Pause className="w-3.5 h-3.5 text-brand-red fill-brand-red" />
                   <span>Paused</span>
                 </span>
                 {activeEta && (
@@ -175,18 +190,6 @@ export function ProgressSpotlight({
                   <span className="text-[11px] font-medium text-white/90 bg-black border border-[#333333] px-2.5 py-0.5 rounded-full flex items-center gap-1.5 shadow-md shadow-black/80 animate-in fade-in duration-150">
                     <Clock className="w-3 h-3 text-brand-red stroke-[2.2]" />
                     <span>{activeEta}</span>
-                  </span>
-                )}
-                {progress.status === 'normalizing' && (
-                  <span className="text-[11px] font-medium text-amber-400 bg-black border border-amber-500/30 px-2.5 py-0.5 rounded-full flex items-center gap-1.5 shadow-md shadow-black/80">
-                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-                    <span>Normalizing…</span>
-                  </span>
-                )}
-                {progress.status === 'stitching' && (
-                  <span className="text-[11px] font-medium text-purple-400 bg-black border border-purple-500/30 px-2.5 py-0.5 rounded-full flex items-center gap-1.5 shadow-md shadow-black/80">
-                    <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse" />
-                    <span>Stitching video…</span>
                   </span>
                 )}
               </>
@@ -225,10 +228,18 @@ export function ProgressSpotlight({
 
           <div className="min-w-0 space-y-1">
             <span className="text-xs text-content-muted font-medium">
-              Clip {progress.current_item || 1} of {progress.total_items || selectedClips.length}
+              {progress.status === 'stitching'
+                ? 'Merging All Segments'
+                : progress.status === 'embedding_chapters'
+                ? 'Finalizing Metadata'
+                : `Clip ${progress.current_item || 1} of ${progress.total_items || selectedClips.length}`}
             </span>
             <p className="text-sm font-medium text-content-primary truncate max-w-lg">
-              {progress.current_video_title || currentClip?.title || 'Preparing next segment…'}
+              {progress.status === 'stitching'
+                ? 'Stitching all segments into final video…'
+                : progress.status === 'embedding_chapters'
+                ? 'Embedding chapters into merged video…'
+                : (progress.current_video_title || currentClip?.title || 'Preparing next segment…')}
             </p>
           </div>
         </div>
