@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { api } from '@/services/api';
-import { CheckCircle2, Play, FolderOpen, FolderCheck, Coffee } from 'lucide-react';
+import { CheckCircle2, Play, FolderOpen, FolderCheck, Coffee, X } from 'lucide-react';
 
 interface SuccessModalProps {
   outputFile: string;
@@ -40,8 +40,26 @@ export function SuccessModal({ outputFile, onReset, onOpenSupport }: SuccessModa
   };
 
   return (
-    <Card className="p-8 max-w-xl mx-auto flex flex-col items-center text-center space-y-6 border-stroke-hover bg-theme-surface shadow-2xl select-none animate-in zoom-in-95 duration-200">
-      <div className="w-16 h-16 rounded-full bg-brand-red/15 border border-brand-red/30 flex items-center justify-center text-brand-red shadow-xl shadow-brand-red/20">
+    <div
+      role="dialog"
+      aria-modal="true"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm select-none animate-in fade-in duration-200"
+      onClick={onReset}
+    >
+      <Card
+        onClick={(e) => e.stopPropagation()}
+        className="relative p-8 max-w-xl w-full flex flex-col items-center text-center space-y-6 border border-stroke-hover bg-[#141414] shadow-2xl select-none animate-in zoom-in-95 duration-200"
+      >
+        <button
+          type="button"
+          onClick={onReset}
+          className="absolute top-4 right-4 p-2 rounded-full text-content-muted hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+          title="Close"
+        >
+          <X className="w-5 h-5" />
+        </button>
+
+        <div className="w-16 h-16 rounded-full bg-brand-red/15 border border-brand-red/30 flex items-center justify-center text-brand-red shadow-xl shadow-brand-red/20">
         {isFolder ? (
           <FolderCheck className="w-10 h-10 stroke-[2.2]" />
         ) : (
@@ -116,5 +134,6 @@ export function SuccessModal({ outputFile, onReset, onOpenSupport }: SuccessModa
         )}
       </div>
     </Card>
+  </div>
   );
 }

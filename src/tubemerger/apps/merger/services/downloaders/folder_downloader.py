@@ -9,6 +9,7 @@ from typing import Callable, List, Optional
 
 from tubemerger.apps.history.services import HistoryService
 from tubemerger.apps.merger.services.format_builder import build_download_command
+from tubemerger.apps.merger.services.progress_parser import format_seconds_remaining
 from tubemerger.apps.merger.services.specs import PipelineStatus, ProgressSnapshot
 from tubemerger.apps.telemetry.service import categorize_ytdlp_error, is_resolvable_error
 from tubemerger.utils.file_system import safe_remove_directory
@@ -66,6 +67,7 @@ class FolderDownloader:
         consecutive_failures = 0
         circuit_breaker_limit = 3
         archive_file = target_folder / ".tubemerge_archive.txt"
+        start_time = time.time()
 
         for idx, clip in enumerate(selected_entries, start=1):
             self._check_pause()
@@ -98,17 +100,21 @@ class FolderDownloader:
                     total_items=total_videos,
                     current_video_title=clip.title,
                     overall_percent=round(pct, 1),
+                    speed=last_speed[0],
+                    eta=last_eta[0],
                     message=f"Verified ({idx}/{total_videos}): {clip.title} (already downloaded)",
                 ))
                 continue
 
-            pct = (idx / total_videos) * 98.0
+            base_pct = ((idx - 1) / total_videos) * 98.0
             self._emit(ProgressSnapshot(
                 status=PipelineStatus.DOWNLOADING,
                 current_item=idx,
                 total_items=total_videos,
                 current_video_title=clip.title,
-                overall_percent=pct,
+                overall_percent=round(base_pct, 1),
+                speed=last_speed[0],
+                eta=last_eta[0],
                 message=f"Downloading ({idx}/{total_videos}): {clip.title}",
             ))
 
@@ -125,15 +131,36 @@ class FolderDownloader:
                 archive_path=archive_file,
             )
 
-            def _folder_progress(clip_pct: float, spd: str):
-                overall = ((idx - 1 + (clip_pct / 100.0)) / total_videos) * 98.0
+            clip_highest_pct = [0.0]
+
+            def _folder_progress(clip_pct: float, spd: str, eta: Optional[str] = None):
+                clip_highest_pct[0] = max(clip_highest_pct[0], clip_pct)
+                effective_clip_pct = clip_highest_pct[0]
+                overall = ((idx - 1 + (effective_clip_pct / 100.0)) / total_videos) * 98.0
+
+                # Calculate overall playlist remaining time based on elapsed time and completed progress
+                completed_ratio = (idx - 1 + (effective_clip_pct / 100.0)) / total_videos
+                elapsed = time.time() - start_time
+                playlist_eta = None
+                if completed_ratio > 0.01 and elapsed > 2.0:
+                    estimated_total = elapsed / completed_ratio
+                    remaining_sec = max(0.0, estimated_total - elapsed)
+                    playlist_eta = format_seconds_remaining(remaining_sec)
+
+                display_eta = playlist_eta or eta
+                if spd:
+                    last_speed[0] = spd
+                if display_eta:
+                    last_eta[0] = display_eta
+
                 self._emit(ProgressSnapshot(
                     status=PipelineStatus.DOWNLOADING,
                     current_item=idx,
                     total_items=total_videos,
                     current_video_title=clip.title,
                     overall_percent=round(overall, 1),
-                    speed=spd or None,
+                    speed=spd or last_speed[0],
+                    eta=display_eta or last_eta[0],
                     message=(
                         f"Downloading ({idx}/{total_videos}): {clip.title} • {spd}"
                         if spd
@@ -141,7 +168,23 @@ class FolderDownloader:
                     ),
                 ))
 
-            rc, stderr_out = self._run_download(dl_cmd, on_progress_update=_folder_progress)
+            def _folder_status(status_msg: str):
+                self._emit(ProgressSnapshot(
+                    status=PipelineStatus.DOWNLOADING,
+                    current_item=idx,
+                    total_items=total_videos,
+                    current_video_title=clip.title,
+                    overall_percent=round(base_pct, 1),
+                    speed=last_speed[0],
+                    eta=last_eta[0],
+                    message=f"{status_msg} ({idx}/{total_videos}): {clip.title}",
+                ))
+
+            rc, stderr_out = self._run_download(
+                dl_cmd,
+                on_progress_update=_folder_progress,
+                on_status_update=_folder_status,
+            )
 
             # Automated in-engine retry for resolvable transient errors
             if rc != 0 and not self._is_cancelled():
@@ -158,13 +201,17 @@ class FolderDownloader:
                             current_item=idx,
                             total_items=total_videos,
                             current_video_title=clip.title,
-                            overall_percent=round(pct, 1),
+                            overall_percent=round(base_pct, 1),
                             message=f"Network hiccup on '{clip.title}', retrying ({attempt}/2) in {int(backoff_sec)}s…",
                         ))
                         time.sleep(backoff_sec)
                         if self._is_cancelled():
                             break
-                        rc, stderr_out = self._run_download(dl_cmd, on_progress_update=_folder_progress)
+                        rc, stderr_out = self._run_download(
+                            dl_cmd,
+                            on_progress_update=_folder_progress,
+                            on_status_update=_folder_status,
+                        )
                         if rc == 0:
                             logger.info("Retry %d succeeded for %s!", attempt, clip.title)
                             break

@@ -203,7 +203,119 @@ class TestSystemSettings(unittest.TestCase):
                 self.assertTrue(read_back.get("tour_completed"))
 
 
+class TestProgressParsingAndMonotonicity(unittest.TestCase):
+    def test_parse_status_line_with_eta(self):
+        from tubemerger.apps.merger.services.progress_parser import parse_status_line
+        res = parse_status_line("STATUS| 45.0%| 5.2MiB/s| 01:25")
+        self.assertIsNotNone(res)
+        pct, spd, eta = res
+        self.assertEqual(pct, 45.0)
+        self.assertEqual(spd, "5.2MB/s")
+        self.assertEqual(eta, "1m 25s left")
+
+    def test_format_human_eta_seconds_only(self):
+        from tubemerger.apps.merger.services.progress_parser import format_human_eta
+        self.assertEqual(format_human_eta("00:45"), "45s left")
+        self.assertEqual(format_human_eta("00:00"), "Almost done")
+        self.assertEqual(format_human_eta("02:10:05"), "2h 10m left")
+        self.assertIsNone(format_human_eta("NA"))
+        self.assertIsNone(format_human_eta("Unknown"))
+
+    def test_format_seconds_remaining(self):
+        from tubemerger.apps.merger.services.progress_parser import format_seconds_remaining
+        self.assertEqual(format_seconds_remaining(30), "30s left")
+        self.assertEqual(format_seconds_remaining(150), "2m 30s left")
+        self.assertEqual(format_seconds_remaining(3665), "1h 01m left")
+
+    def test_engine_emit_strictly_monotonic(self):
+        from tubemerger.apps.merger.services.engine import MergeEngine, MergeJobSpec
+        from tubemerger.apps.merger.services.specs import ProgressSnapshot, PipelineStatus
+
+        spec = MergeJobSpec(playlist_url="https://youtube.com/playlist?list=test", selected_indices=[0])
+        engine = MergeEngine(
+            job_spec=spec,
+            ytdlp_path="dummy",
+            ffmpeg_path="dummy",
+            metadata_service=MagicMock(),
+        )
+
+        # Emit 35.0%
+        engine._emit(ProgressSnapshot(status=PipelineStatus.DOWNLOADING, overall_percent=35.0))
+        self.assertEqual(engine._last_snapshot.overall_percent, 35.0)
+
+        # Attempt to emit lower percent (e.g. 10.0% due to stream switch)
+        engine._emit(ProgressSnapshot(status=PipelineStatus.DOWNLOADING, overall_percent=10.0))
+        # Monotonic invariant clamps to 35.0%
+        self.assertEqual(engine._last_snapshot.overall_percent, 35.0)
+
+        # Higher percent advances
+        engine._emit(ProgressSnapshot(status=PipelineStatus.DOWNLOADING, overall_percent=42.5))
+        self.assertEqual(engine._last_snapshot.overall_percent, 42.5)
+
+
+class TestFeedbackService(unittest.TestCase):
+    def test_submit_review_generates_github_url(self):
+        from tubemerger.apps.feedback.services.brevo_service import FeedbackService
+        res = FeedbackService.submit_review(
+            rating=5,
+            review_text="Fast and smooth downloads!",
+            user_email="tester@example.com",
+            system_info={"platform": "Linux"},
+        )
+        self.assertEqual(res["status"], "ok")
+        self.assertIn("github.com/hashamtanveer-41/tubemerger/issues/new", res["github_url"])
+        self.assertIn("User%20Review", res["github_url"])
+        self.assertIn("mailto:hashamtanveer41@gmail.com", res["mailto_url"])
+        self.assertIn("mail.google.com", res["gmail_url"])
+
+    def test_submit_cancellation_complaint(self):
+        from tubemerger.apps.feedback.services.brevo_service import FeedbackService
+        res = FeedbackService.submit_cancellation_complaint(
+            reason="Loading bar felt stuck",
+            complaint_text="Progress stopped at 40%",
+            job_details={"overall_percent": 40.0, "clip_count": 10, "preset": "1080p"},
+        )
+        self.assertEqual(res["status"], "ok")
+        self.assertIn("Cancellation%20Complaint", res["github_url"])
+        self.assertIn("mailto:hashamtanveer41@gmail.com", res["mailto_url"])
+        self.assertIn("mail.google.com", res["gmail_url"])
+
+
+    def test_stream_progress_preserves_speed_and_eta(self):
+        import asyncio
+        import json
+        from tubemerger.apps.merger.controllers.merge_controller import MergeController
+        from tubemerger.apps.merger.models import ProgressSnapshot, PipelineStatus
+
+        ctrl = MergeController()
+        snap1 = ProgressSnapshot(status=PipelineStatus.DOWNLOADING, overall_percent=20.0, speed="3.5MB/s", eta="1m 30s left")
+        snap2 = ProgressSnapshot(status=PipelineStatus.DOWNLOADING, overall_percent=25.0, message="Connecting to media stream…", speed=None, eta=None)
+        snap3 = ProgressSnapshot(status=PipelineStatus.DONE, overall_percent=100.0, message="Done")
+
+        async def run_test():
+            resp = await ctrl.stream_progress()
+            q = ctrl.progress_queues[-1]
+            q.put_nowait(snap1)
+            q.put_nowait(snap2)
+            q.put_nowait(snap3)
+
+            events = []
+            async for chunk in resp.body_iterator:
+                if chunk.startswith("data: "):
+                    events.append(json.loads(chunk[6:].strip()))
+            return events
+
+        events = asyncio.run(run_test())
+        self.assertEqual(len(events), 3)
+        self.assertEqual(events[0]["speed"], "3.5MB/s")
+        self.assertEqual(events[0]["eta"], "1m 30s left")
+        # snap2 had None for speed and eta, but stream_progress preserved them during DOWNLOADING
+        self.assertEqual(events[1]["speed"], "3.5MB/s")
+        self.assertEqual(events[1]["eta"], "1m 30s left")
+
+
 if __name__ == "__main__":
     unittest.main()
+
 
 

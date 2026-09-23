@@ -47,7 +47,7 @@ class SingleDownloader:
         """Download a single video or audio directly into the user's Downloads directory."""
         clean_title = "".join(c for c in clip.title if c.isalnum() or c in " _-").strip()
         if not clean_title:
-            clean_title = f"TubeMerge_{job_id}"
+            clean_title = f"TubeMerger_{job_id}"
 
         media_type = "audio" if is_audio else "video"
         self._emit(ProgressSnapshot(
@@ -55,8 +55,8 @@ class SingleDownloader:
             current_item=1,
             total_items=1,
             current_video_title=clip.title,
-            overall_percent=15.0,
-            message=f"Downloading {media_type}: {clip.title}",
+            overall_percent=0.0,
+            message=f"Connecting to {media_type}: {clip.title}…",
         ))
 
         out_template = str(downloads_dir / f"{clean_title}.%(ext)s")
@@ -71,18 +71,44 @@ class SingleDownloader:
             is_batch=False,
         )
 
-        def _on_single_progress(clip_pct: float, spd: str):
+        highest_clip_pct = [0.0]
+        last_speed = [None]
+        last_eta = [None]
+
+        def _on_single_progress(clip_pct: float, spd: str, eta: Optional[str] = None):
+            highest_clip_pct[0] = max(highest_clip_pct[0], clip_pct)
+            if spd:
+                last_speed[0] = spd
+            if eta:
+                last_eta[0] = eta
             self._emit(ProgressSnapshot(
                 status=PipelineStatus.DOWNLOADING,
                 current_item=1,
                 total_items=1,
                 current_video_title=clip.title,
-                overall_percent=round(clip_pct, 1),
-                speed=spd or None,
+                overall_percent=round(highest_clip_pct[0], 1),
+                speed=spd or last_speed[0],
+                eta=eta or last_eta[0],
                 message=f"Downloading: {clip.title} • {spd}" if spd else f"Downloading: {clip.title}",
             ))
 
-        rc, stderr_out = self._run_download(dl_cmd, on_progress_update=_on_single_progress)
+        def _on_single_status(status_msg: str):
+            self._emit(ProgressSnapshot(
+                status=PipelineStatus.DOWNLOADING,
+                current_item=1,
+                total_items=1,
+                current_video_title=clip.title,
+                overall_percent=round(highest_clip_pct[0], 1),
+                speed=last_speed[0],
+                eta=last_eta[0],
+                message=f"{status_msg} {clip.title}",
+            ))
+
+        rc, stderr_out = self._run_download(
+            dl_cmd,
+            on_progress_update=_on_single_progress,
+            on_status_update=_on_single_status,
+        )
 
         # Automatic retry with exponential backoff for resolvable transient errors
         if rc != 0 and not self._is_cancelled():
@@ -99,13 +125,17 @@ class SingleDownloader:
                         current_item=1,
                         total_items=1,
                         current_video_title=clip.title,
-                        overall_percent=15.0,
+                        overall_percent=round(highest_clip_pct[0], 1),
                         message=f"Network hiccup, retrying ({attempt}/2) in {int(backoff_sec)}s…",
                     ))
                     time.sleep(backoff_sec)
                     if self._is_cancelled():
                         break
-                    rc, stderr_out = self._run_download(dl_cmd, on_progress_update=_on_single_progress)
+                    rc, stderr_out = self._run_download(
+                        dl_cmd,
+                        on_progress_update=_on_single_progress,
+                        on_status_update=_on_single_status,
+                    )
                     if rc == 0:
                         logger.info("Retry %d succeeded for %s!", attempt, clip.title)
                         break

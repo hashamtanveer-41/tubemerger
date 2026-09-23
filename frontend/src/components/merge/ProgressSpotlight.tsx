@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ProgressEvent, VideoClip } from '@/types';
 import { Card } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
-import { CheckCircle2, Circle, PlayCircle, XCircle, ArrowDown, Pause, Play } from 'lucide-react';
+import { CheckCircle2, Circle, PlayCircle, XCircle, ArrowDown, Pause, Play, Clock } from 'lucide-react';
 
 interface ProgressSpotlightProps {
   progress: ProgressEvent;
@@ -27,6 +27,60 @@ export function ProgressSpotlight({
   const currentIdx = progress.current_item || 1;
   const currentClip = selectedClips[currentIdx - 1];
   const [cancelClicked, setCancelClicked] = useState(false);
+
+  // Strictly monotonic display percentage with smooth tweening
+  const [displayPercent, setDisplayPercent] = useState<number>(progress.overall_percent || 0);
+
+  // Retain last known speed and remaining time during download so badges never flicker or disappear
+  const [persistentSpeed, setPersistentSpeed] = useState<string | null>(progress.speed || null);
+  const [persistentEta, setPersistentEta] = useState<string | null>(progress.eta || null);
+
+  useEffect(() => {
+    if (progress.speed) {
+      setPersistentSpeed(progress.speed);
+    }
+  }, [progress.speed]);
+
+  useEffect(() => {
+    if (progress.eta) {
+      setPersistentEta(progress.eta);
+    }
+  }, [progress.eta]);
+
+  const isDownloading = progress.status === 'downloading' || !progress.status;
+  const activeSpeed = progress.speed || (isDownloading ? persistentSpeed : null);
+  const activeEta = progress.eta || (isDownloading || isPaused ? persistentEta : null);
+
+  useEffect(() => {
+    const rawTarget = Number(progress.overall_percent) || 0;
+    const target = Math.min(100, Math.max(displayPercent, rawTarget));
+    if (Math.abs(target - displayPercent) < 0.1) {
+      setDisplayPercent(target);
+      return;
+    }
+
+    let animationFrameId: number;
+    const startVal = displayPercent;
+    const startTime = performance.now();
+    const duration = 250;
+
+    const animate = (currentTime: number) => {
+      const elapsed = currentTime - startTime;
+      const progressRatio = Math.min(elapsed / duration, 1);
+      const easeOut = 1 - Math.pow(1 - progressRatio, 3);
+      const nextVal = startVal + (target - startVal) * easeOut;
+      setDisplayPercent(Math.max(startVal, Number(nextVal.toFixed(1))));
+
+      if (progressRatio < 1) {
+        animationFrameId = requestAnimationFrame(animate);
+      } else {
+        setDisplayPercent(target);
+      }
+    };
+
+    animationFrameId = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(animationFrameId);
+  }, [progress.overall_percent]);
 
   return (
     <Card className="p-6 space-y-6 border-stroke-card bg-theme-surface select-none shadow-2xl max-w-4xl mx-auto">
@@ -91,28 +145,58 @@ export function ProgressSpotlight({
         </div>
       </div>
 
-      {/* Overall Progress Bar with Live Download Speed */}
+      {/* Overall Progress Bar with Live Download Speed & Remaining Time */}
       <div className="space-y-2">
         <div className="flex justify-between items-center text-xs">
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2 flex-wrap">
             <span className="text-content-secondary font-medium">Overall Progress</span>
             {isPaused ? (
-              <span className="text-[11px] font-semibold text-brand-red bg-black border border-brand-red/40 px-2.5 py-0.5 rounded-full flex items-center gap-1 shadow-md shadow-black/80 animate-in fade-in duration-150">
-                <Pause className="w-3 h-3 text-brand-red fill-brand-red" />
-                <span>Paused</span>
-              </span>
-            ) : progress.speed ? (
-              <span className="text-[11px] font-semibold text-brand-red bg-black border border-brand-red/40 px-2.5 py-0.5 rounded-full flex items-center gap-1 shadow-md shadow-black/80 animate-in fade-in duration-150">
-                <ArrowDown className="w-3 h-3 text-brand-red stroke-[2.5]" />
-                <span>{progress.speed}</span>
-              </span>
-            ) : null}
+              <>
+                <span className="text-[11px] font-semibold text-brand-red bg-black border border-brand-red/40 px-2.5 py-0.5 rounded-full flex items-center gap-1 shadow-md shadow-black/80 animate-in fade-in duration-150">
+                  <Pause className="w-3 h-3 text-brand-red fill-brand-red" />
+                  <span>Paused</span>
+                </span>
+                {activeEta && (
+                  <span className="text-[11px] font-medium text-white/90 bg-black border border-[#333333] px-2.5 py-0.5 rounded-full flex items-center gap-1.5 shadow-md shadow-black/80 animate-in fade-in duration-150">
+                    <Clock className="w-3 h-3 text-brand-red stroke-[2.2]" />
+                    <span>{activeEta}</span>
+                  </span>
+                )}
+              </>
+            ) : (
+              <>
+                {activeSpeed && (
+                  <span className="text-[11px] font-semibold text-brand-red bg-black border border-brand-red/40 px-2.5 py-0.5 rounded-full flex items-center gap-1 shadow-md shadow-black/80 animate-in fade-in duration-150">
+                    <ArrowDown className="w-3 h-3 text-brand-red stroke-[2.5]" />
+                    <span>{activeSpeed}</span>
+                  </span>
+                )}
+                {activeEta && (
+                  <span className="text-[11px] font-medium text-white/90 bg-black border border-[#333333] px-2.5 py-0.5 rounded-full flex items-center gap-1.5 shadow-md shadow-black/80 animate-in fade-in duration-150">
+                    <Clock className="w-3 h-3 text-brand-red stroke-[2.2]" />
+                    <span>{activeEta}</span>
+                  </span>
+                )}
+                {progress.status === 'normalizing' && (
+                  <span className="text-[11px] font-medium text-amber-400 bg-black border border-amber-500/30 px-2.5 py-0.5 rounded-full flex items-center gap-1.5 shadow-md shadow-black/80">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                    <span>Normalizing…</span>
+                  </span>
+                )}
+                {progress.status === 'stitching' && (
+                  <span className="text-[11px] font-medium text-purple-400 bg-black border border-purple-500/30 px-2.5 py-0.5 rounded-full flex items-center gap-1.5 shadow-md shadow-black/80">
+                    <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse" />
+                    <span>Stitching video…</span>
+                  </span>
+                )}
+              </>
+            )}
           </div>
           <span className="text-content-primary font-semibold text-sm font-mono">
-            {progress.overall_percent}%
+            {displayPercent}%
           </span>
         </div>
-        <Progress value={progress.overall_percent} className="h-2" />
+        <Progress value={displayPercent} className="h-2" />
       </div>
 
       {/* Active Clip Spotlight Card */}

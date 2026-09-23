@@ -63,6 +63,17 @@ def setup_desktop_environment() -> None:
     """Configure platform-specific GUI variables and process IDs."""
     init_stdio()
 
+    # Ensure localhost and 127.0.0.1 bypass any system proxy so loopback calls never get intercepted
+    current_no_proxy = os.environ.get("no_proxy", "")
+    needed = ["localhost", "127.0.0.1"]
+    current_parts = [p.strip() for p in current_no_proxy.split(",") if p.strip()]
+    for host in needed:
+        if host not in current_parts:
+            current_parts.append(host)
+    merged_no_proxy = ",".join(current_parts)
+    os.environ["no_proxy"] = merged_no_proxy
+    os.environ["NO_PROXY"] = merged_no_proxy
+
     # Linux desktop environment fixes for GObject Introspection & WebKitGTK
     if sys.platform.startswith("linux"):
         # 1. Ensure system typelibs are discoverable inside PyInstaller frozen bundles

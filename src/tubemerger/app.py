@@ -19,7 +19,7 @@ setup_desktop_environment()
 def run() -> None:
     """Launch backend service and open native desktop window."""
     print(BANNER)
-    print("Starting TubeMerge backend...")
+    print("Starting TubeMerger backend...")
 
     # Dynamic Port Allocation: Lease an ephemeral kernel port if default 7842 is busy/held
     actual_port = settings.find_available_port(settings.HOST, settings.PORT)

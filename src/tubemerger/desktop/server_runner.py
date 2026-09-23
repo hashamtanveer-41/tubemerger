@@ -24,9 +24,11 @@ def start_server(port: int) -> None:
 def wait_for_server(timeout: float = 12.0) -> bool:
     """Poll the backend /api/ping endpoint until it responds or timeout is reached."""
     deadline = time.time() + timeout
+    # Explicitly bypass any system/env proxies for local readiness check
+    direct_opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
     while time.time() < deadline:
         try:
-            with urllib.request.urlopen(f"{settings.SERVER_URL}/api/ping", timeout=0.5) as r:
+            with direct_opener.open(f"{settings.SERVER_URL}/api/ping", timeout=0.5) as r:
                 if r.status == 200:
                     return True
         except Exception:

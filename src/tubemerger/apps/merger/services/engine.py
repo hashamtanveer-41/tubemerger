@@ -83,6 +83,7 @@ class MergeEngine:
         self._pause_event.set()
         self._current_proc: Optional[subprocess.Popen] = None
         self._last_snapshot: Optional[ProgressSnapshot] = None
+        self._highest_percent: float = 0.0
 
         # Delegate normalization and stitching to dedicated services
         self.normalizer_service = VideoNormalizerService(
@@ -186,6 +187,20 @@ class MergeEngine:
 
     def _emit(self, snapshot: ProgressSnapshot) -> None:
         """Emit progress update to listener and cleanup queue upon completion."""
+        active_statuses = (
+            PipelineStatus.DOWNLOADING,
+            PipelineStatus.NORMALIZING,
+            PipelineStatus.STITCHING,
+            PipelineStatus.EMBEDDING_CHAPTERS,
+        )
+        if snapshot.status in active_statuses:
+            snapshot.overall_percent = max(self._highest_percent, float(snapshot.overall_percent or 0.0))
+            self._highest_percent = snapshot.overall_percent
+            snapshot.overall_percent = round(snapshot.overall_percent, 1)
+        elif snapshot.status == PipelineStatus.DONE:
+            snapshot.overall_percent = 100.0
+            self._highest_percent = 100.0
+
         self._last_snapshot = snapshot
         if snapshot.status == PipelineStatus.DONE:
             try:
@@ -208,7 +223,8 @@ class MergeEngine:
     def _run_ytdlp_download(
         self,
         cmd: List[str],
-        on_progress_update: Optional[Callable[[float, str], None]] = None,
+        on_progress_update: Optional[Callable[..., None]] = None,
+        on_status_update: Optional[Callable[[str], None]] = None,
         timeout: int = 1800,
     ) -> Tuple[int, str]:
         """Execute yt-dlp CLI process with line-by-line progress stream parsing."""
@@ -239,14 +255,25 @@ class MergeEngine:
                         time.sleep(0.25)
                     line_str = line.strip()
                     output_lines.append(line_str)
+
+                    # Check for milestone phrases to keep UI informed during silent phases
+                    if on_status_update:
+                        if "[youtube]" in line_str or "Downloading webpage" in line_str:
+                            on_status_update("Connecting to media stream…")
+                        elif "[Merger]" in line_str or "Merging formats" in line_str:
+                            on_status_update("Muxing audio & video formats…")
+
                     if on_progress_update:
                         parsed = parse_status_line(line_str)
                         if parsed:
-                            pct, spd = parsed
+                            pct, spd, eta = parsed
                             now = time.time()
-                            if now - last_emit >= 0.2:
+                            if now - last_emit >= 0.15 or pct >= 100.0:
                                 last_emit = now
-                                on_progress_update(pct, spd)
+                                try:
+                                    on_progress_update(pct, spd, eta)
+                                except TypeError:
+                                    on_progress_update(pct, spd)
             proc.wait(timeout=timeout)
             return proc.returncode, "\n".join(output_lines[-15:])
         finally:

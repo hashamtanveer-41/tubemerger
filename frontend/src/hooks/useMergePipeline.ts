@@ -19,6 +19,12 @@ export function useMergePipeline(
   const [quality, setQuality] = useState<VideoQuality>('1080p');
   const [format, setFormat] = useState<'mp4' | 'mp3'>('mp4');
 
+  const [cancellationInfo, setCancellationInfo] = useState<{
+    overall_percent?: number;
+    clip_count?: number;
+    preset?: string;
+  } | null>(null);
+
   const pauseMerge = useCallback(async () => {
     setIsPaused(true);
     setProgress((prev) =>
@@ -66,15 +72,28 @@ export function useMergePipeline(
   }, [showToast]);
 
   const cancelMerge = useCallback(async () => {
-    await api.cancelMerge();
+    setCancellationInfo({
+      overall_percent: progress?.overall_percent || 0,
+      clip_count: progress?.total_items || 0,
+      preset: quality,
+    });
+    try {
+      await api.cancelMerge();
+    } catch {
+      // ignore
+    }
     setIsMerging(false);
     setIsPaused(false);
     setProgress(null);
     showToast('Download cancelled.', 'info');
-  }, [showToast]);
+  }, [progress, quality, showToast]);
 
   const dismissFailureModal = useCallback(() => {
     setFailureInfo(null);
+  }, []);
+
+  const dismissCancellationModal = useCallback(() => {
+    setCancellationInfo(null);
   }, []);
 
   return {
@@ -86,6 +105,8 @@ export function useMergePipeline(
     setOutputFile,
     failureInfo,
     setFailureInfo,
+    cancellationInfo,
+    dismissCancellationModal,
     isPaused,
     setIsPaused,
     mergeVideos,

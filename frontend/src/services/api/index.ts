@@ -16,6 +16,7 @@ import { AuthEndpoints } from './endpoints/auth';
 import { LicenseEndpoints } from './endpoints/license';
 import { AdminEndpoints } from './endpoints/admin';
 import { TelemetryEndpoints } from './endpoints/telemetry';
+import { FeedbackEndpoints } from './endpoints/feedback';
 import { UpdateCheckResult, UpdateEndpoints } from './endpoints/updates';
 
 export type { UpdateCheckResult } from './endpoints/updates';
@@ -31,6 +32,7 @@ export class ApiClient {
   private license: LicenseEndpoints;
   private admin: AdminEndpoints;
   private telemetry: TelemetryEndpoints;
+  private feedback: FeedbackEndpoints;
   private updates: UpdateEndpoints;
 
   constructor(client: HttpClient = httpClient) {
@@ -44,6 +46,7 @@ export class ApiClient {
     this.license = new LicenseEndpoints(client);
     this.admin = new AdminEndpoints(client);
     this.telemetry = new TelemetryEndpoints(client);
+    this.feedback = new FeedbackEndpoints(client);
     this.updates = new UpdateEndpoints(client);
   }
 
@@ -123,6 +126,13 @@ export class ApiClient {
 
   // Telemetry
   trackEvent = (eventName: string, props?: Record<string, any>) => this.telemetry.trackEvent(eventName, props);
+
+  // Feedback
+  submitReview = (payload: Parameters<FeedbackEndpoints['submitReview']>[0]) =>
+    this.feedback.submitReview(payload);
+  submitCancellationComplaint = (
+    payload: Parameters<FeedbackEndpoints['submitCancellationComplaint']>[0]
+  ) => this.feedback.submitCancellationComplaint(payload);
 
   // Updates
   checkForUpdates = () => this.updates.checkForUpdates();

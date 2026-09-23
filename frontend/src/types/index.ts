@@ -48,10 +48,25 @@ export interface ProgressEvent {
   overall_percent: number;
   message: string;
   speed?: string;
+  eta?: string;
   output_file?: string;
   error?: string;
   error_subtype?: string;
   is_resolvable?: boolean;
+}
+
+export interface ReviewPayload {
+  rating: number;
+  review_text: string;
+  user_email?: string;
+  system_info?: Record<string, any>;
+}
+
+export interface CancellationComplaintPayload {
+  reason: string;
+  complaint_text?: string;
+  job_details?: Record<string, any>;
+  user_email?: string;
 }
 
 export interface BinaryItem {

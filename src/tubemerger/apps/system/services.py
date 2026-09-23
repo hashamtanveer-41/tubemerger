@@ -189,9 +189,9 @@ class SystemService:
 
     @classmethod
     def open_url(cls, url: str) -> bool:
-        """Open web URL in host system's default browser with clean environment."""
+        """Open web URL or mailto link in host system's default browser/client with clean environment."""
         cleaned = (url or "").strip()
-        if not cleaned.startswith(("http://", "https://")):
+        if not cleaned.startswith(("http://", "https://", "mailto:")):
             return False
         system = platform.system()
         try:

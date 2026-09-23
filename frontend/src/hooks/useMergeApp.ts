@@ -89,6 +89,8 @@ export function useMergeApp() {
     resumeMerge,
     cancelMerge,
     dismissFailureModal,
+    cancellationInfo,
+    dismissCancellationModal,
   } = useMergePipeline(showToast);
 
   // Bootstrapping session & health
@@ -445,6 +447,8 @@ export function useMergeApp() {
     failureInfo,
     setFailureInfo,
     dismissFailureModal,
+    cancellationInfo,
+    dismissCancellationModal,
     retryMerge,
   };
 }

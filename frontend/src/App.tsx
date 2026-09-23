@@ -17,6 +17,8 @@ import { SuccessModal } from '@/components/merge/SuccessModal';
 import { FloatingActionBar } from '@/components/merge/FloatingActionBar';
 import { SpotlightTour } from '@/components/tour/SpotlightTour';
 import { SupportModal } from '@/components/common/SupportModal';
+import { ReviewModal } from '@/components/common/ReviewModal';
+import { CancellationComplaintModal } from '@/components/common/CancellationComplaintModal';
 import { ReportIssueModal } from '@/components/common/ReportIssueModal';
 import { Toast } from '@/components/ui/toast';
 import { Spinner } from '@/components/ui/spinner';
@@ -31,15 +33,29 @@ export function App() {
   const { startupState, updateInfo, handleRetry } = useStartupCheck();
   const { isTourOpen, setIsTourOpen } = useTourManager(startupState);
   const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
 
   // Synchronize Dynamic SEO Tags & Document Titles for Active Features
   useDocumentMeta(app.activeTab, app.playlist);
 
-  // Automatically open Support Modal once a merge/download finishes
+  // Completion modal arbitration: Review modal (at 3-4 videos) vs Support modal
   useEffect(() => {
     if (!app.isMerging && app.outputFile) {
       const timer = setTimeout(() => {
-        setIsSupportModalOpen(true);
+        const completedClips = app.selectedIndices?.size || app.playlist?.video_count || 1;
+        const currentCount = parseInt(localStorage.getItem('tubemerger_completed_clips_count') || '0', 10);
+        const newCount = currentCount + completedClips;
+        localStorage.setItem('tubemerger_completed_clips_count', String(newCount));
+
+        const reviewDismissed = localStorage.getItem('tubemerger_review_dismissed') === 'true';
+
+        // Prompt review when user reaches 3 to 4 completed videos
+        if (!reviewDismissed && newCount >= 3) {
+          setIsReviewModalOpen(true);
+        } else {
+          // Show voluntary support modal when review modal is not shown
+          setIsSupportModalOpen(true);
+        }
       }, 500);
       return () => clearTimeout(timer);
     }
@@ -218,7 +234,7 @@ export function App() {
                     )
                   )}
 
-                  {!app.isMerging && !app.outputFile && app.playlist && (
+                  {!app.isMerging && app.playlist && (
                     <DiscoveryView
                       playlist={app.playlist}
                       selectedIndices={app.selectedIndices}
@@ -236,7 +252,7 @@ export function App() {
                     />
                   )}
 
-                  {!app.isMerging && !app.outputFile && !app.playlist && (
+                  {!app.isMerging && !app.playlist && (
                     <EmptyStateView />
                   )}
                 </>
@@ -279,6 +295,22 @@ export function App() {
       <SupportModal
         isOpen={isSupportModalOpen}
         onClose={() => setIsSupportModalOpen(false)}
+      />
+
+      {/* 3-4 Video Milestone Review Modal */}
+      <ReviewModal
+        isOpen={isReviewModalOpen}
+        onClose={() => {
+          localStorage.setItem('tubemerger_review_dismissed', 'true');
+          setIsReviewModalOpen(false);
+        }}
+      />
+
+      {/* Cancellation Complaint / Feedback Modal */}
+      <CancellationComplaintModal
+        isOpen={Boolean(app.cancellationInfo)}
+        onClose={app.dismissCancellationModal}
+        jobDetails={app.cancellationInfo || undefined}
       />
 
       {/* Failure Diagnostic & Issue Submission Modal */}

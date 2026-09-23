@@ -140,12 +140,29 @@ class MergeController:
                 pass
 
         async def event_generator():
+            last_known_speed = None
+            last_known_eta = None
             try:
                 while True:
                     try:
                         snapshot: ProgressSnapshot = await asyncio.wait_for(q.get(), timeout=15.0)
                         from tubemerger.apps.telemetry.service import categorize_ytdlp_error, is_resolvable_error
                         err_sub = getattr(snapshot, "error_subtype", None) or (categorize_ytdlp_error(str(snapshot.error or "")) if snapshot.error else None)
+
+                        snap_speed = getattr(snapshot, "speed", None)
+                        snap_eta = getattr(snapshot, "eta", None)
+                        is_active_download = (
+                            snapshot.status == PipelineStatus.DOWNLOADING
+                            or (isinstance(snapshot.status, str) and snapshot.status.lower() == "downloading")
+                        )
+                        if snap_speed:
+                            last_known_speed = snap_speed
+                        if snap_eta:
+                            last_known_eta = snap_eta
+
+                        effective_speed = snap_speed or (last_known_speed if is_active_download else None)
+                        effective_eta = snap_eta or (last_known_eta if is_active_download else None)
+
                         data = {
                             "status": snapshot.status.value
                                 if hasattr(snapshot.status, "value") else snapshot.status,
@@ -154,7 +171,8 @@ class MergeController:
                             "current_video_title": snapshot.current_video_title,
                             "overall_percent": round(snapshot.overall_percent, 1),
                             "message": snapshot.message,
-                            "speed": getattr(snapshot, "speed", None),
+                            "speed": effective_speed,
+                            "eta": effective_eta,
                             "output_file": snapshot.output_file,
                             "error": snapshot.error,
                             "error_subtype": err_sub,

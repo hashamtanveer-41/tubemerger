@@ -39,10 +39,10 @@ export function HomeView({
       {/* Hero Banner */}
       <div className="text-center space-y-3 pt-4">
         <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-content-primary">
-          Merge Playlists into <span className="text-brand-red">Single Master Videos</span>
+          Merge Playlists into <span className="text-brand-red">Single Master Video</span>
         </h1>
         <p className="text-sm sm:text-base text-content-secondary max-w-2xl mx-auto leading-relaxed">
-          Combine YouTube courses, music playlists, or video series into continuous videos with automatic chapter markers, or extract real 320kbps MP3s.
+          Combine YouTube courses, music playlists, or video series into a continuous video with automatic chapter markers, or extract real 320kbps MP3s.
         </p>
       </div>
 
@@ -83,9 +83,6 @@ export function HomeView({
             </div>
           </div>
         </form>
-        <p className="text-center text-[11px] text-content-dim mt-2.5">
-          Supports YouTube playlists, videos, albums, and shorts. Sequential processing prevents bandwidth choking.
-        </p>
       </div>
 
       {/* 3 Action Workflow Cards */}
