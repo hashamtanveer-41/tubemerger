@@ -120,7 +120,8 @@ class FeedbackService:
             "#### Review / Feedback",
             review_text.strip() if review_text else "*(No additional comments)*",
         ]
-        github_url = f"https://github.com/{GITHUB_REPO}/issues/new?title={urllib.parse.quote(title)}&body={urllib.parse.quote('\n'.join(body_lines))}"
+        body_text = "\n".join(body_lines)
+        github_url = f"https://github.com/{GITHUB_REPO}/issues/new?title={urllib.parse.quote(title)}&body={urllib.parse.quote(body_text)}"
 
         # 3. Send email asynchronously via Brevo if API key is active
         html_content = f"""
@@ -196,7 +197,8 @@ class FeedbackService:
             "#### User Details / Notes",
             complaint_text.strip() if complaint_text else "*(None provided)*",
         ]
-        github_url = f"https://github.com/{GITHUB_REPO}/issues/new?title={urllib.parse.quote(title)}&body={urllib.parse.quote('\n'.join(body_lines))}"
+        body_text = "\n".join(body_lines)
+        github_url = f"https://github.com/{GITHUB_REPO}/issues/new?title={urllib.parse.quote(title)}&body={urllib.parse.quote(body_text)}"
 
         # 3. Send email asynchronously via Brevo if configured
         html_content = f"""
