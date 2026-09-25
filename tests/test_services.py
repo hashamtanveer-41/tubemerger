@@ -314,8 +314,81 @@ class TestFeedbackService(unittest.TestCase):
         self.assertEqual(events[1]["eta"], "1m 30s left")
 
 
+class TestFolderDownloaderAndErrorHandling(unittest.TestCase):
+    def test_folder_downloader_runs_without_name_error(self):
+        import tempfile
+        from tubemerger.apps.merger.services.downloaders.folder_downloader import FolderDownloader
+        from tubemerger.apps.merger.services.specs import ProgressSnapshot, PipelineStatus
+
+        clips = [
+            VideoClip(id="c1", title="Clip One", url="https://youtube.com/watch?v=c1", duration_seconds=10),
+            VideoClip(id="c2", title="Clip Two", url="https://youtube.com/watch?v=c2", duration_seconds=20),
+        ]
+        pl = Playlist(playlist_id="p1", title="Test Playlist", channel="Creator", webpage_url="https://youtube.com/playlist?list=p1", entries=clips)
+
+        snapshots = []
+        def emit_cb(snap: ProgressSnapshot):
+            snapshots.append(snap)
+
+        with tempfile.TemporaryDirectory() as td:
+            d_dir = Path(td) / "downloads"
+            t_dir = Path(td) / "temp"
+            d_dir.mkdir()
+            t_dir.mkdir()
+
+            def mock_run_download(cmd, on_progress_update=None, on_status_update=None):
+                if on_progress_update:
+                    on_progress_update(50.0, "5.0MB/s", "10s left")
+                # simulate creating output file
+                # target folder is inside d_dir
+                for sub in d_dir.iterdir():
+                    if sub.is_dir():
+                        for idx, clip in enumerate(clips, 1):
+                            clean = "".join(c for c in clip.title if c.isalnum() or c in " _-")[:80].strip()
+                            (sub / f"{idx:02d} - {clean}.mp4").write_bytes(b"dummy_video_data")
+                return 0, ""
+
+            fd = FolderDownloader(
+                ytdlp_path="yt-dlp",
+                ffmpeg_path="ffmpeg",
+                run_download_fn=mock_run_download,
+                emit_fn=emit_cb,
+                check_pause_fn=lambda: None,
+                check_cancelled_fn=lambda: False,
+            )
+
+            # This must complete without NameError: name 'last_speed' is not defined
+            fd.download(
+                selected_entries=clips,
+                playlist=pl,
+                job_id="test1234",
+                is_audio=False,
+                quality="1080p",
+                audio_bitrate=None,
+                downloads_dir=d_dir,
+                temp_dir=t_dir,
+            )
+
+            self.assertTrue(len(snapshots) > 0)
+            download_snaps = [s for s in snapshots if s.status == PipelineStatus.DOWNLOADING]
+            self.assertTrue(len(download_snaps) >= 2)
+
+    def test_categorize_ytdlp_error_extracts_subtype_token(self):
+        from tubemerger.apps.telemetry.classifier import categorize_ytdlp_error
+        # Previously returned 'other_Download_failed_for_...'
+        res = categorize_ytdlp_error("Download failed for My Video (network_timeout): connection timed out")
+        self.assertEqual(res, "network_timeout")
+
+        res2 = categorize_ytdlp_error("Download failed for Film (bot_detection): Sign in to confirm you're not a bot")
+        self.assertEqual(res2, "bot_detection")
+
+        res3 = categorize_ytdlp_error("Download failed for Song (rate_limited_429): HTTP Error 429: Too Many Requests")
+        self.assertEqual(res3, "rate_limited_429")
+
+
 if __name__ == "__main__":
     unittest.main()
+
 
 
 

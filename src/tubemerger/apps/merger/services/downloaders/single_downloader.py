@@ -9,7 +9,7 @@ from typing import Callable, Optional
 
 from tubemerger.apps.history.services import HistoryService
 from tubemerger.apps.merger.services.format_builder import build_download_command
-from tubemerger.apps.merger.services.specs import PipelineStatus, ProgressSnapshot
+from tubemerger.apps.merger.services.specs import PipelineStatus, ProgressSnapshot, PipelineExecutionError
 from tubemerger.apps.telemetry.service import categorize_ytdlp_error, is_resolvable_error
 from tubemerger.utils.file_system import safe_remove_directory
 
@@ -45,7 +45,7 @@ class SingleDownloader:
         temp_dir: Path,
     ) -> None:
         """Download a single video or audio directly into the user's Downloads directory."""
-        clean_title = "".join(c for c in clip.title if c.isalnum() or c in " _-").strip()
+        clean_title = "".join(c for c in clip.title if c.isalnum() or c in " _-").strip()[:80]
         if not clean_title:
             clean_title = f"TubeMerger_{job_id}"
 
@@ -144,7 +144,11 @@ class SingleDownloader:
             err_msg = (stderr_out or "").strip()
             err_sub = categorize_ytdlp_error(err_msg)
             safe_remove_directory(temp_dir)
-            raise RuntimeError(f"Download failed for {clip.title} ({err_sub}): {err_msg[:200] if err_msg else 'Unknown error'}")
+            raise PipelineExecutionError(
+                f"Download failed for {clip.title} ({err_sub}): {err_msg[:200] if err_msg else 'Unknown error'}",
+                error_subtype=err_sub,
+                raw_error=err_msg,
+            )
 
         target_ext = ".mp3" if is_audio else ".mp4"
         candidates = [

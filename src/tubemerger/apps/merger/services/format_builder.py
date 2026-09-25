@@ -56,9 +56,9 @@ def build_download_command(
         "--no-warnings",
         "--newline",
         "--ignore-errors",
-        "--socket-timeout", "30",
-        "--retries", "3",
-        "--fragment-retries", "5",
+        "--socket-timeout", "45",
+        "--retries", "5",
+        "--fragment-retries", "10",
         "--extractor-args", "youtube:player_client=android,web",
         "--cache-dir", cache_dir,
     ]

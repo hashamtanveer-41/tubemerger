@@ -5,7 +5,19 @@ import re
 
 def categorize_ytdlp_error(error_message: str) -> str:
     """Categorize raw yt-dlp error string into a standardized, privacy-safe error code for Aptabase."""
-    msg = (error_message or "").lower().replace("’", "'").replace("`", "'")
+    raw = (error_message or "").strip()
+    match = re.search(r'\(([a-z0-9_]+)\):', raw)
+    if match:
+        candidate = match.group(1)
+        if candidate in (
+            "rate_limited_429", "bot_detection", "geo_restricted", "copyright_takedown",
+            "age_restricted", "live_stream", "missing_ffmpeg_binary", "format_not_available",
+            "video_unavailable", "network_timeout", "circuit_breaker_rate_limit",
+            "all_downloads_failed", "disk_full", "permission_denied",
+        ) or candidate.startswith("other_"):
+            return candidate
+
+    msg = raw.lower().replace("’", "'").replace("`", "'")
     if "http error 429" in msg or "too many requests" in msg:
         return "rate_limited_429"
     elif "bot verification" in msg or "not a bot" in msg or "automated queries" in msg or "prove you're human" in msg or ("bot" in msg and "sign in" in msg):

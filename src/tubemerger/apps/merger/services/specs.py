@@ -19,6 +19,14 @@ class PipelineStatus(str, Enum):
     ERROR = "error"
 
 
+class PipelineExecutionError(RuntimeError):
+    """Exception raised when a pipeline download or merge step fails with a classified subtype."""
+    def __init__(self, message: str, error_subtype: Optional[str] = None, raw_error: str = ""):
+        super().__init__(message)
+        self.error_subtype = error_subtype
+        self.raw_error = raw_error
+
+
 @dataclass
 class MergeJobSpec:
     playlist_url: str

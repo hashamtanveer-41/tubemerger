@@ -10,7 +10,7 @@ from typing import Callable, List, Optional
 from tubemerger.apps.history.services import HistoryService
 from tubemerger.apps.merger.services.format_builder import build_download_command
 from tubemerger.apps.merger.services.progress_parser import format_seconds_remaining
-from tubemerger.apps.merger.services.specs import PipelineStatus, ProgressSnapshot
+from tubemerger.apps.merger.services.specs import PipelineStatus, ProgressSnapshot, PipelineExecutionError
 from tubemerger.apps.telemetry.service import categorize_ytdlp_error, is_resolvable_error
 from tubemerger.utils.file_system import safe_remove_directory
 
@@ -50,7 +50,7 @@ class FolderDownloader:
         """Download all selected playlist entries into a dedicated folder."""
         clean_playlist_title = "".join(
             c for c in (playlist.title or "Playlist") if c.isalnum() or c in " _-"
-        ).strip()
+        ).strip()[:60]
         folder_prefix = "TubeMerger (Audio)" if is_audio else "TubeMerger"
         folder_name = (
             f"{folder_prefix} - {clean_playlist_title}"
@@ -68,6 +68,8 @@ class FolderDownloader:
         circuit_breaker_limit = 3
         archive_file = target_folder / ".tubemerge_archive.txt"
         start_time = time.time()
+        last_speed = [None]
+        last_eta = [None]
 
         for idx, clip in enumerate(selected_entries, start=1):
             self._check_pause()
@@ -77,7 +79,7 @@ class FolderDownloader:
 
             clean_clip_title = "".join(
                 c for c in clip.title if c.isalnum() or c in " _-"
-            ).strip()
+            ).strip()[:80]
             if not clean_clip_title:
                 clean_clip_title = f"track_{idx:02d}" if is_audio else f"video_{idx:02d}"
 
@@ -227,9 +229,11 @@ class FolderDownloader:
                 # Fast-Fail Circuit Breaker: Halt early if YouTube is blocking at the start
                 if consecutive_failures >= circuit_breaker_limit and len(downloaded_files) == 0:
                     err_sub = categorize_ytdlp_error(last_folder_err)
-                    raise RuntimeError(
+                    raise PipelineExecutionError(
                         f"YouTube rate limit detected (circuit breaker tripped after {consecutive_failures} consecutive failures). "
-                        f"Stopped early to protect your connection ({err_sub}): {last_folder_err[:200]}"
+                        f"Stopped early to protect your connection ({err_sub}): {last_folder_err[:200]}",
+                        error_subtype=err_sub,
+                        raw_error=last_folder_err,
                     )
                 continue
             else:
@@ -246,7 +250,11 @@ class FolderDownloader:
         if not downloaded_files:
             err_sub = categorize_ytdlp_error(last_folder_err)
             err_suffix = f" ({err_sub}): {last_folder_err[:200]}" if last_folder_err else ""
-            raise RuntimeError(f"No files could be downloaded from this playlist{err_suffix}.")
+            raise PipelineExecutionError(
+                f"No files could be downloaded from this playlist{err_suffix}.",
+                error_subtype=err_sub,
+                raw_error=last_folder_err,
+            )
 
         safe_remove_directory(temp_dir)
         try:

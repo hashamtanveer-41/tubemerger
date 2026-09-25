@@ -233,6 +233,8 @@ class MergeEngine:
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             bufsize=1,
             universal_newlines=True,
             **get_hidden_subprocess_kwargs(),
@@ -395,7 +397,7 @@ class MergeEngine:
         except Exception as exc:
             safe_remove_directory(temp_dir)
             err_str = str(exc)
-            err_sub = categorize_ytdlp_error(err_str)
+            err_sub = getattr(exc, "error_subtype", None) or categorize_ytdlp_error(err_str)
             self._emit(ProgressSnapshot(
                 status=PipelineStatus.ERROR,
                 error=err_str,

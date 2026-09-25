@@ -11,7 +11,7 @@ from tubemerger.apps.history.services import HistoryService
 from tubemerger.apps.merger.services.format_builder import build_download_command
 from tubemerger.apps.merger.services.normalizer import VideoNormalizerService
 from tubemerger.apps.merger.services.progress_parser import format_seconds_remaining
-from tubemerger.apps.merger.services.specs import PipelineStatus, ProgressSnapshot
+from tubemerger.apps.merger.services.specs import PipelineStatus, ProgressSnapshot, PipelineExecutionError
 from tubemerger.apps.merger.services.stitcher import VideoStitcherService
 from tubemerger.apps.telemetry.service import categorize_ytdlp_error, is_resolvable_error
 from tubemerger.core import settings
@@ -231,9 +231,11 @@ class MergePipeline:
                 # Fast-Fail Circuit Breaker: Halt early if YouTube is blocking at the start
                 if consecutive_failures >= circuit_breaker_limit and len(raw_files) == 0:
                     err_sub = categorize_ytdlp_error(last_merge_err)
-                    raise RuntimeError(
+                    raise PipelineExecutionError(
                         f"YouTube rate limit detected (circuit breaker tripped after {consecutive_failures} consecutive failures). "
-                        f"Stopped early to protect your connection ({err_sub}): {last_merge_err[:200]}"
+                        f"Stopped early to protect your connection ({err_sub}): {last_merge_err[:200]}",
+                        error_subtype=err_sub,
+                        raw_error=last_merge_err,
                     )
                 continue
             else:
@@ -249,7 +251,11 @@ class MergePipeline:
         if not raw_files:
             err_sub = categorize_ytdlp_error(last_merge_err)
             err_suffix = f" ({err_sub}): {last_merge_err[:200]}" if last_merge_err else ""
-            raise RuntimeError(f"No files were successfully downloaded{err_suffix}; nothing to merge.")
+            raise PipelineExecutionError(
+                f"No files were successfully downloaded{err_suffix}; nothing to merge.",
+                error_subtype=err_sub,
+                raw_error=last_merge_err,
+            )
 
         # 3. Normalization phase
         normalized_files: List[Path] = []
