@@ -12,7 +12,7 @@ from typing import Dict, Any
 APP_NAME = "TubeMerger"
 APP_TAGLINE = "YouTube Playlist Merger"
 DOMAIN = "tubemerger.com"
-VERSION = "1.1.5"
+VERSION = "1.1.6"
 
 
 

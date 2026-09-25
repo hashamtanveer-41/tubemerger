@@ -8,6 +8,6 @@ BANNER = r"""
 ║      ╚═╝    ╚═════╝ ╚═════╝ ╚══════╝                        ║
 ║                                                              ║
 ║        M E R G E    —    YouTube Playlist Merger             ║
-║              tubemerger.com  •  v1.1.5              ║
+║              tubemerger.com  •  v1.1.6              ║
 ╚══════════════════════════════════════════════════════════════╝
 """
