@@ -236,3 +236,175 @@ When a previous job completed naturally (`PipelineStatus.DONE`), the `_cancel_ev
 ### Why This Solution Works
 `threading.Thread.is_alive()` queries the real OS thread execution state. Combined with explicit pointer release upon terminal pipeline transitions (`DONE`, `ERROR`, `CANCELLED`), the concurrency lock accurately reflects actual workload execution and prevents deadlock or false positive rejection.
 
+---
+
+## 9. Backward Incompatibility in Python Runtime Syntax (PEP 701 vs. Python 3.11 CI Matrix)
+
+### Context & Problem
+Continuous integration builds suddenly failed during test discovery on GitHub Actions runners executing under Python 3.11:
+```text
+  File "/tubemerger/src/tubemerger/apps/feedback/services/brevo_service.py", line 108
+    f"Review:\n{data.get('review', '').replace('\n', '\n> ')}"
+                                                      ^
+SyntaxError: f-string expression part cannot include a backslash
+```
+However, the test suite and application executed without errors on local development environments running Python 3.14.
+
+### Root Cause
+Python 3.12 introduced **PEP 701** ("Syntactic formalization of f-strings"), lifting historical restrictions and permitting arbitrary Python expressions—including backslashes (`\n`), quotes, and nested expressions—inside f-string replacement fields `{...}`. Under Python 3.11 and earlier, the parser strictly prohibited backslashes within f-string braces at compile time. Developing on Python 3.14 obscured this syntax incompatibility until the matrix build evaluated Python 3.11.
+
+### Engineering Approach & Solution
+Refactored string interpolation in `src/tubemerger/apps/feedback/services/brevo_service.py` to extract complex string transformations before constructing the f-string:
+```python
+# Before (PEP 701 only - fails on Python <= 3.11):
+body = f"Review:\n{data.get('review', '').replace('\n', '\n> ')}"
+
+# After (Universal Python 3.10+ compatibility):
+quoted_review = data.get("review", "").replace("\n", "\n> ")
+body = f"Review:\n{quoted_review}"
+```
+
+### Why This Solution Works
+Decoupling data transformation from string formatting guarantees compliance with earlier Python parsers while retaining readable, clean string generation across all supported runtime versions (Python 3.10 through 3.14+).
+
+---
+
+## 10. Monotonic ETA Progression & Unmerged Batch Download State Invariants
+
+### Context & Problem
+Following the v1.1.5 release, production telemetry revealed a severe failure cluster: **14 distinct users across 6 countries** (Albania, Netherlands, Mexico, India, etc.) suffered complete job failures when choosing the "Separate Videos" (unmerged batch) download mode. Error logs reported:
+```text
+NameError: name 'last_speed' is not defined
+```
+This single defect accounted for **93.3% of all production errors** logged for v1.1.5.
+
+### Root Cause
+In `FolderDownloader.download()` (`apps/merger/services/downloaders/folder_downloader.py`), the internal yt-dlp progress hook closure relied on tracking previous download speeds and estimated completion times (ETA) across chunk updates to smooth out bursty transfer rates and prevent flickering:
+```python
+if speed is not None:
+    last_speed[0] = speed
+elif last_speed[0] is not None:
+    speed = last_speed[0]
+```
+While `last_speed = [None]` and `last_eta = [None]` were initialized in `SingleDownloader` and `MergePipeline`, they were omitted from `FolderDownloader.download()`. The moment yt-dlp invoked the callback on an unmerged playlist item, Python's runtime raised an unhandled `NameError`.
+
+### Engineering Approach & Solution
+1. **Initialize Mutable Closure State**:
+   Initialized mutable reference cells within `FolderDownloader.download()` prior to launching the item iteration loop:
+   ```python
+   last_speed = [None]
+   last_eta = [None]
+   ```
+2. **Monotonic Fallback Smoothing**:
+   Ensured that during temporary chunk transitions where yt-dlp reports `None` for transfer speed or ETA, the UI retains the last known non-null metrics rather than resetting to `N/A`.
+3. **Comprehensive Regression Testing**:
+   Added dedicated test coverage in `tests/test_services.py` simulating yt-dlp progress callback invocations specifically against `FolderDownloader`.
+
+### Why This Solution Works
+Encapsulating mutable cell lists within the local method frame gives the callback closure read/write access without scope leakage, ensuring smooth progress metrics without runtime `NameError` crashes.
+
+---
+
+## 11. Cross-Platform Windows Subprocess Encoding & Path Length Bounds
+
+### Context & Problem
+On Windows installations, users attempting to download playlists with non-ASCII characters (e.g., Cyrillic, Ukrainian, accented Spanish, or emoji titles) encountered fatal crashes during stream consumption:
+```text
+UnicodeDecodeError: 'charmap' codec can't decode byte 0x90 in position 24: character maps to <undefined>
+```
+Simultaneously, playlists with lengthy titles nested inside folder paths failed with OS filesystem errors (`WinError 206: The filename or extension is too long`).
+
+### Root Cause
+1. On Windows, Python's `subprocess.Popen(..., text=True)` defaults to the system ANSI code page (`cp1252` or `Windows-1251`) rather than UTF-8. When yt-dlp streams metadata in UTF-8 containing characters outside the local code page, decoding pipe output throws `UnicodeDecodeError`.
+2. Windows imposes a default `MAX_PATH` constraint of 260 characters. When deep directory structures combine with long playlist names and individual video titles, path lengths quickly exceed this threshold.
+
+### Engineering Approach & Solution
+1. **Explicit UTF-8 Subprocess Pipe Decoding**:
+   In `apps/merger/services/engine.py`, explicitly configured the process stdout pipe to enforce UTF-8 with non-fatal replacement on decoding errors:
+   ```python
+   proc = subprocess.Popen(
+       cmd,
+       stdout=subprocess.PIPE,
+       stderr=subprocess.STDOUT,
+       text=True,
+       encoding="utf-8",
+       errors="replace",
+       bufsize=1,
+   )
+   ```
+2. **Defensive Path Length Truncation**:
+   In `apps/merger/services/downloaders/folder_downloader.py`, bounded directory names to 60 characters and filenames to 80 characters using sanitized slugs:
+   ```python
+   safe_folder = sanitize_filename(playlist_title)[:60].strip()
+   safe_title = sanitize_filename(video_title)[:80].strip()
+   ```
+
+### Why This Solution Works
+Forcing UTF-8 decoding with `errors="replace"` guarantees that child process pipe reading never raises an unhandled exception, substituting any malformed byte sequences with `\ufffd`. Bounding individual path components guarantees total path depth remains well within Windows `MAX_PATH` limitations.
+
+---
+
+## 12. Telemetry Error Masking & Typed Pipeline Exception Hierarchy
+
+### Context & Problem
+Production telemetry events were overwhelmingly categorized under generic catch-all buckets:
+```text
+other_Download_failed_for_Sample_Title_...
+other_HTTP_Error_403_Forbidden
+```
+This obscured distinct failure modes—such as bot-detection throttling (HTTP 403), private video permissions, and geographical restrictions—preventing automated alerting and aggregate triaging.
+
+### Root Cause
+When lower-level downloaders caught yt-dlp subprocess failures, they wrapped the exception into generic string templates:
+```python
+raise RuntimeError(f"Download failed for '{video.title}': {str(e)}")
+```
+Because standard `RuntimeError` instances strip metadata, downstream telemetry reporting could only read the formatted string. The classifier regexes failed to match wrapped strings and defaulted to prefixing `other_` to the entire string.
+
+### Engineering Approach & Solution
+1. **Typed Pipeline Exception**:
+   Defined a structured `PipelineExecutionError` in `apps/merger/services/specs.py`:
+   ```python
+   class PipelineExecutionError(RuntimeError):
+       def __init__(
+           self,
+           message: str,
+           original_error: Exception | None = None,
+           error_subtype: str | None = None,
+       ):
+           super().__init__(message)
+           self.original_error = original_error
+           self.error_subtype = error_subtype
+   ```
+2. **Error Subtype Extraction**:
+   Updated `SingleDownloader`, `FolderDownloader`, and `MergePipeline` to extract underlying error categories (`private_video`, `geo_restricted`, `http_403`, `network_timeout`) from yt-dlp output and propagate them through `PipelineExecutionError`.
+3. **Resilient Regex Classifier**:
+   Updated `apps/telemetry/classifier.py` with multi-token regex patterns capable of extracting failure subtypes from wrapped message strings.
+
+### Why This Solution Works
+Preserving structured error metadata decouples user-facing UI messages ("Download failed for...") from telemetry analytics taxonomies, enabling accurate aggregation and actionable observability.
+
+---
+
+## 13. YouTube CDN Connection Stalls & Socket Timeout Resilience
+
+### Context & Problem
+During batch downloads of large playlists or high-bitrate video streams, yt-dlp child processes would occasionally stall indefinitely. The UI showed zero progress, yet the job never timed out or failed.
+
+### Root Cause
+By default, yt-dlp and its underlying HTTP socket connections can hang indefinitely on silent TCP packet drops or aggressive rate-limiting from YouTube's CDN edge nodes. Without explicit socket timeouts and retry boundaries, worker threads remained locked in blocking socket reads.
+
+### Engineering Approach & Solution
+In `apps/merger/services/format_builder.py`, injected resilient socket timeout and retry parameters into yt-dlp invocation arguments:
+```python
+cmd.extend([
+    "--socket-timeout", "45",
+    "--retries", "5",
+    "--fragment-retries", "10",
+])
+```
+
+### Why This Solution Works
+Setting `--socket-timeout 45` ensures that any unresponsive connection is severed after 45 seconds. yt-dlp then automatically retries the failed fragment or stream connection up to the specified retry limit, recovering from transient edge CDN drops without crashing or hanging the pipeline.
+
+
