@@ -187,10 +187,17 @@ class TubeMergerModule(private val reactContext: ReactApplicationContext) :
         }
 
         val title = payload.getString("playlist_title") ?: "TubeMerger_Output"
+        val format = payload.getString("format") ?: "mp4"
+        val quality = payload.getString("quality") ?: "1080p"
+        val ext = if (format.lowercase() == "mp3") "mp3" else "mp4"
         val sanitizedTitle = title.replace(Regex("[^a-zA-Z0-9_-]"), "_")
-        val targetFilename = "${sanitizedTitle}_${System.currentTimeMillis()}.mp4"
+        val targetFilename = "${sanitizedTitle}_${System.currentTimeMillis()}.$ext"
 
         val outputDir = java.io.File(reactContext.getExternalFilesDir(null), "TubeMerger").apply {
+            if (!exists()) mkdirs()
+        }
+
+        val stagingDir = java.io.File(reactContext.cacheDir, "staging_${System.currentTimeMillis()}").apply {
             if (!exists()) mkdirs()
         }
 
@@ -214,7 +221,7 @@ class TubeMergerModule(private val reactContext: ReactApplicationContext) :
         val jobId = "job_${System.currentTimeMillis()}"
         Thread {
             try {
-                val result = engine.executeMerge(nativeClips, outputDir, targetFilename)
+                val result = engine.executeMerge(nativeClips, outputDir, stagingDir, targetFilename, quality, format)
                 if (result.isSuccess) {
                     val file = result.getOrNull()
                     Log.i(TAG, "Merge completed successfully: ${file?.absolutePath}")
@@ -228,6 +235,10 @@ class TubeMergerModule(private val reactContext: ReactApplicationContext) :
                 Log.e(TAG, "Engine execution error: ${e.message}", e)
             } finally {
                 currentEngine = null
+                val stopIntent = Intent(reactContext, TubeMergerForegroundService::class.java).apply {
+                    action = TubeMergerForegroundService.ACTION_STOP
+                }
+                reactContext.startService(stopIntent)
             }
         }.start()
 
@@ -535,22 +546,30 @@ class TubeMergerModule(private val reactContext: ReactApplicationContext) :
             val currentRaw = prefs.getString("history_items", "[]") ?: "[]"
             val currentArray = org.json.JSONArray(currentRaw)
             val newItem = JSONObject(itemJson)
+            val newFilePath = newItem.optString("filePath", "")
+            val newFileName = newItem.optString("fileName", "")
+
             val currentThumb = newItem.optString("thumbnail", "")
             if (currentThumb.isBlank() || currentThumb == "null") {
-                val filePath = newItem.optString("filePath", "")
-                if (filePath.isNotBlank()) {
-                    val thumb = getOrCreateThumbnail(filePath)
+                if (newFilePath.isNotBlank()) {
+                    val thumb = getOrCreateThumbnail(newFilePath)
                     if (thumb != null) {
                         newItem.put("thumbnail", thumb)
                     }
                 }
             }
 
+            // Deduplicate: replace any existing record with same filePath or fileName
             val newArray = org.json.JSONArray()
             newArray.put(newItem)
             for (i in 0 until currentArray.length()) {
-                if (i < 49) {
-                    newArray.put(currentArray.getJSONObject(i))
+                val existing = currentArray.getJSONObject(i)
+                val existingPath = existing.optString("filePath", "")
+                val existingName = existing.optString("fileName", "")
+                val isDup = (newFilePath.isNotBlank() && existingPath == newFilePath) ||
+                            (newFileName.isNotBlank() && existingName == newFileName)
+                if (!isDup && newArray.length() < 50) {
+                    newArray.put(existing)
                 }
             }
             prefs.edit().putString("history_items", newArray.toString()).apply()
@@ -568,9 +587,15 @@ class TubeMergerModule(private val reactContext: ReactApplicationContext) :
 
             // If history is empty, auto-detect any existing completed output files
             if (raw == "[]" || raw.isBlank()) {
-                val outputDir = reactContext.getExternalFilesDir("TubeMerger")
-                val files = outputDir?.listFiles { file ->
-                    file.isFile && (file.name.endsWith(".mp4") || file.name.endsWith(".mp3")) && !file.name.startsWith("norm_") && !file.name.endsWith(".part")
+                val outputDir = java.io.File(reactContext.getExternalFilesDir(null), "TubeMerger")
+                val files = outputDir.listFiles { file ->
+                    file.isFile &&
+                    (file.name.endsWith(".mp4", ignoreCase = true) || file.name.endsWith(".mp3", ignoreCase = true)) &&
+                    !file.name.startsWith("norm_") &&
+                    !file.name.startsWith("clip_") &&
+                    !file.name.endsWith(".part") &&
+                    !file.name.endsWith(".ytdl") &&
+                    file.length() > 0
                 }
                 if (!files.isNullOrEmpty()) {
                     val array = org.json.JSONArray()
@@ -584,7 +609,7 @@ class TubeMergerModule(private val reactContext: ReactApplicationContext) :
                             put("timestamp", file.lastModified())
                             put("dateFormatted", sdf.format(java.util.Date(file.lastModified())))
                             put("clipCount", 1)
-                            put("format", if (file.name.endsWith(".mp3")) "mp3" else "mp4")
+                            put("format", if (file.name.endsWith(".mp3", ignoreCase = true)) "mp3" else "mp4")
                             put("resolution", "1080p")
                             val thumb = getOrCreateThumbnail(file.absolutePath)
                             if (thumb != null) {
@@ -597,35 +622,50 @@ class TubeMergerModule(private val reactContext: ReactApplicationContext) :
                     prefs.edit().putString("history_items", raw).apply()
                 }
             } else {
-                // Ensure existing records have thumbnails if local video file exists
+                // Ensure existing records have thumbnails and are strictly deduplicated
                 try {
                     val currentArray = org.json.JSONArray(raw)
+                    val seenPaths = HashSet<String>()
+                    val seenNames = HashSet<String>()
+                    val cleanArray = org.json.JSONArray()
                     var modified = false
+
                     for (i in 0 until currentArray.length()) {
                         val item = currentArray.getJSONObject(i)
-                        val currentThumb = item.optString("thumbnail", "")
                         val filePath = item.optString("filePath", "")
-                        if (filePath.isNotBlank()) {
-                            val localThumbExists = if (currentThumb.startsWith("file://")) {
-                                val f = java.io.File(currentThumb.removePrefix("file://"))
-                                f.exists() && f.length() > 3000
-                            } else false
+                        val fileName = item.optString("fileName", "")
 
-                            val needsThumb = currentThumb.isBlank() || 
-                                             currentThumb == "null" || 
-                                             (!currentThumb.startsWith("http://") && !currentThumb.startsWith("https://") && !localThumbExists)
+                        // Deduplicate identical items
+                        val isDup = (filePath.isNotBlank() && seenPaths.contains(filePath)) ||
+                                    (fileName.isNotBlank() && seenNames.contains(fileName))
+                        if (isDup) {
+                            modified = true
+                            continue
+                        }
+                        if (filePath.isNotBlank()) seenPaths.add(filePath)
+                        if (fileName.isNotBlank()) seenNames.add(fileName)
 
-                            if (needsThumb) {
-                                val thumb = getOrCreateThumbnail(filePath)
-                                if (thumb != null) {
-                                    item.put("thumbnail", thumb)
-                                    modified = true
-                                }
+                        val currentThumb = item.optString("thumbnail", "")
+                        val localThumbExists = if (currentThumb.startsWith("file://")) {
+                            val f = java.io.File(currentThumb.removePrefix("file://"))
+                            f.exists() && f.length() > 3000
+                        } else false
+
+                        val needsThumb = currentThumb.isBlank() || 
+                                         currentThumb == "null" || 
+                                         (!currentThumb.startsWith("http://") && !currentThumb.startsWith("https://") && !localThumbExists)
+
+                        if (needsThumb && filePath.isNotBlank()) {
+                            val thumb = getOrCreateThumbnail(filePath)
+                            if (thumb != null) {
+                                item.put("thumbnail", thumb)
+                                modified = true
                             }
                         }
+                        cleanArray.put(item)
                     }
                     if (modified) {
-                        raw = currentArray.toString()
+                        raw = cleanArray.toString()
                         prefs.edit().putString("history_items", raw).apply()
                     }
                 } catch (e: Exception) {

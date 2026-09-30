@@ -33,7 +33,7 @@ class FFmpegStitcher(context: Context) : IVideoStitcher {
             return success
         }
 
-        val concatListFile = File(outputFile.parentFile, "concat_list_${System.currentTimeMillis()}.txt")
+        val concatListFile = File(outputFile.parentFile ?: outputFile.absoluteFile.parentFile, "concat_list_${System.currentTimeMillis()}.txt")
         FileWriter(concatListFile).use { writer ->
             for (file in inputFiles) {
                 writer.write("file '${file.absolutePath}'\n")
@@ -42,23 +42,36 @@ class FFmpegStitcher(context: Context) : IVideoStitcher {
 
         Log.i(TAG, "Stitching ${inputFiles.size} files into ${outputFile.name}")
 
-        val args = listOf(
+        val isMp3 = outputFile.name.endsWith(".mp3", ignoreCase = true)
+        val args = mutableListOf(
             "-y",
             "-f", "concat",
             "-safe", "0",
             "-i", concatListFile.absolutePath,
-            "-c", "copy",
-            "-movflags", "+faststart",
-            outputFile.absolutePath
+            "-c", "copy"
         )
+        if (!isMp3) {
+            args.add("-movflags")
+            args.add("+faststart")
+        }
+        args.add(outputFile.absolutePath)
+
+        var monotonicPercent = 10.0
+        onProgress(monotonicPercent)
 
         val result = executor.execute(args) { line ->
-            if (line.contains("size=")) {
-                onProgress(60.0)
+            if (line.contains("size=") || line.contains("time=")) {
+                monotonicPercent = Math.max(monotonicPercent, Math.min(95.0, monotonicPercent + 15.0))
+                onProgress(monotonicPercent)
             }
         }
 
-        concatListFile.delete()
+        try {
+            concatListFile.delete()
+        } catch (e: Exception) {
+            // ignore
+        }
+
         onProgress(100.0)
         return result.exitCode == 0 && outputFile.exists() && outputFile.length() > 0
     }

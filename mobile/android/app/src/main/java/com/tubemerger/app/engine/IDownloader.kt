@@ -29,6 +29,8 @@ interface IDownloader {
     fun downloadClips(
         clips: List<NativeVideoClip>,
         outputDir: File,
+        quality: String = "1080p",
+        format: String = "mp4",
         onProgress: (NativeProgressSnapshot) -> Unit
     ): List<File>
 

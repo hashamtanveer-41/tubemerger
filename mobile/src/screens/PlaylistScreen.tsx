@@ -1,16 +1,16 @@
 /**
  * TubeMerger Mobile - PlaylistScreen
- * Pixel-perfect match for Screenshot 4:
- * - Header: Back arrow + "Select Videos" + "4 videos selected" + "Clear All" pill
- * - Playlist summary card with thumbnail, channel, red pill count badge, and three-dots menu
+ * Pixel-perfect match for Screenshot 4 + Interactive Quality Modal & Dynamic Size Calculation:
+ * - Header: Back arrow + "Select Videos" + "{X} videos selected" + "Clear All" pill
+ * - Playlist summary card with thumbnail, channel, dynamic duration, dynamic size, and count badge
  * - Segmented format pill tabs: [MP4 Video] (active red) | [MP3 Audio]
- * - Quality dropdown row: "Quality" ... "1080p Full HD ⌵"
+ * - Quality dropdown row: "Quality" ... "1080p Full HD (~350 MB) ⌵" -> Opens Quality Dropdown Modal
  * - Section header: "VIDEOS IN PLAYLIST" in red + "Select All" toggle
  * - Clip list with red checkboxes, HD badges, metadata, and "01", "02" index badges
- * - Bottom floating button: "Merge Selected (X Videos)"
+ * - Bottom floating button: "Merge Selected ({X} Videos • {Size})"
  */
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -19,6 +19,9 @@ import {
   Pressable,
   Image,
   StatusBar,
+  Modal,
+  StyleSheet,
+  Animated,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
@@ -29,6 +32,7 @@ import {
   ChevronDown,
   Check,
   Play,
+  X,
 } from 'lucide-react-native';
 import { RootStackParamList } from '../navigation/types';
 import { ClipItem } from '../components';
@@ -38,11 +42,25 @@ import { OutputFormat, VideoQuality } from '../components';
 import { notificationService } from '../services/notification';
 import { ErrorClassifier } from '../services/errors';
 import { useTheme } from '../theme';
+import { estimateVideoSizeBytes, formatBytes, formatDuration } from '../shared/utils';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Playlist'>;
 
+interface QualityOption {
+  label: string;
+  value: VideoQuality;
+  desc: string;
+}
+
+const QUALITY_OPTIONS: QualityOption[] = [
+  { label: '1080p Full HD', value: '1080p', desc: 'Crisp 1920x1080 resolution' },
+  { label: '720p HD', value: '720p', desc: 'Standard 1280x720 resolution' },
+  { label: '480p SD', value: '480p', desc: 'Faster download, compact size' },
+  { label: '360p', value: '360p', desc: 'Minimal data usage' },
+];
+
 export function PlaylistScreen({ route, navigation }: Props) {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const { url, preloadedPlaylist, format: initialFormat } = route.params;
 
   const [playlist, setPlaylist] = useState<Playlist | null>(preloadedPlaylist || null);
@@ -55,6 +73,36 @@ export function PlaylistScreen({ route, navigation }: Props) {
   });
   const [selectedFormat, setSelectedFormat] = useState<OutputFormat>(initialFormat || 'mp4');
   const [selectedQuality, setSelectedQuality] = useState<VideoQuality>('1080p');
+  const [qualityModalVisible, setQualityModalVisible] = useState<boolean>(false);
+
+  // Animations for quality modal
+  const modalScale = useRef(new Animated.Value(0.88)).current;
+  const modalOpacity = useRef(new Animated.Value(0)).current;
+  const modalBackdrop = useRef(new Animated.Value(0)).current;
+
+  const openQualityModal = () => {
+    modalScale.setValue(0.88);
+    modalOpacity.setValue(0);
+    modalBackdrop.setValue(0);
+    setQualityModalVisible(true);
+
+    Animated.parallel([
+      Animated.timing(modalBackdrop, { toValue: 1, duration: 180, useNativeDriver: true }),
+      Animated.timing(modalOpacity, { toValue: 1, duration: 180, useNativeDriver: true }),
+      Animated.spring(modalScale, { toValue: 1, friction: 7, tension: 65, useNativeDriver: true }),
+    ]).start();
+  };
+
+  const closeQualityModal = (onDone?: () => void) => {
+    Animated.parallel([
+      Animated.timing(modalBackdrop, { toValue: 0, duration: 150, useNativeDriver: true }),
+      Animated.timing(modalOpacity, { toValue: 0, duration: 150, useNativeDriver: true }),
+      Animated.timing(modalScale, { toValue: 0.9, duration: 150, useNativeDriver: true }),
+    ]).start(() => {
+      setQualityModalVisible(false);
+      if (onDone) onDone();
+    });
+  };
 
   useEffect(() => {
     if (!preloadedPlaylist) {
@@ -125,13 +173,39 @@ export function PlaylistScreen({ route, navigation }: Props) {
     return playlist.entries.filter((_, i) => selectedIndices.has(i));
   }, [playlist, selectedIndices]);
 
-  const totalDurationStr = useMemo(() => {
-    if (!playlist) return '0m 00s';
-    const totalSecs = playlist.entries.reduce((acc, c) => acc + (c.duration_seconds || 0), 0);
-    const m = Math.floor(totalSecs / 60);
-    const s = totalSecs % 60;
-    return `${m}m ${s.toString().padStart(2, '0')}s`;
-  }, [playlist]);
+  // Dynamic duration calculation strictly for selected clips
+  const selectedDurationSecs = useMemo(() => {
+    return selectedClips.reduce((acc, c) => acc + (c.duration_seconds || 0), 0);
+  }, [selectedClips]);
+
+  const selectedDurationStr = useMemo(() => {
+    return formatDuration(selectedDurationSecs);
+  }, [selectedDurationSecs]);
+
+  // Dynamic size calculation responding to quality, format, and clip selection
+  const estimatedSizeBytes = useMemo(() => {
+    const qualityOrFormat = selectedFormat === 'mp3' ? 'mp3' : selectedQuality;
+    return estimateVideoSizeBytes(selectedDurationSecs, qualityOrFormat);
+  }, [selectedDurationSecs, selectedFormat, selectedQuality]);
+
+  const estimatedSizeFormatted = useMemo(() => {
+    return formatBytes(estimatedSizeBytes);
+  }, [estimatedSizeBytes]);
+
+  const qualityLabel = useMemo(() => {
+    switch (selectedQuality) {
+      case '1080p':
+        return '1080p Full HD';
+      case '720p':
+        return '720p HD';
+      case '480p':
+        return '480p SD';
+      case '360p':
+        return '360p';
+      default:
+        return '1080p Full HD';
+    }
+  }, [selectedQuality]);
 
   const handleStartMerge = () => {
     if (!playlist || selectedClips.length === 0) {
@@ -146,6 +220,7 @@ export function PlaylistScreen({ route, navigation }: Props) {
         format: selectedFormat,
         quality: selectedQuality,
         selected_indices: Array.from(selectedIndices),
+        estimated_size_mb: Math.round(estimatedSizeBytes / (1024 * 1024)),
       },
       playlistTitle: playlist.title,
       totalClips: selectedClips.length,
@@ -239,14 +314,14 @@ export function PlaylistScreen({ route, navigation }: Props) {
             maxToRenderPerBatch={10}
             windowSize={5}
             ListHeaderComponent={
-              <View style={{ marginBottom: 16 }}>
+              <View style={{ marginBottom: 12 }}>
                 {/* Playlist Summary Card */}
                 <View
                   style={{
                     backgroundColor: colors.card,
                     borderWidth: 1,
                     borderColor: colors.cardBorder,
-                    borderRadius: 18,
+                    borderRadius: 20,
                     padding: 14,
                     marginBottom: 12,
                     flexDirection: 'row',
@@ -256,8 +331,8 @@ export function PlaylistScreen({ route, navigation }: Props) {
                   {/* Thumbnail with overlay */}
                   <View
                     style={{
-                      width: 64,
-                      height: 48,
+                      width: 68,
+                      height: 50,
                       borderRadius: 10,
                       overflow: 'hidden',
                       backgroundColor: colors.inputBg,
@@ -289,7 +364,7 @@ export function PlaylistScreen({ route, navigation }: Props) {
                       {playlist.title}
                     </Text>
                     <Text style={{ fontSize: 11, color: colors.textSecondary }} numberOfLines={1}>
-                      {playlist.channel || 'YouTube'} • {playlist.video_count} videos • {totalDurationStr}
+                      {selectedClips.length} of {playlist.video_count} videos • {selectedDurationStr}
                     </Text>
                     <View
                       style={{
@@ -304,7 +379,7 @@ export function PlaylistScreen({ route, navigation }: Props) {
                       }}
                     >
                       <Text style={{ fontSize: 10, fontWeight: '700', color: colors.brandRed }}>
-                        {playlist.video_count} videos
+                        {selectedClips.length} selected • ~{estimatedSizeFormatted}
                       </Text>
                     </View>
                   </View>
@@ -380,18 +455,48 @@ export function PlaylistScreen({ route, navigation }: Props) {
                   </Pressable>
                 </View>
 
-                {/* Quality Row (if MP4) */}
-                {selectedFormat === 'mp4' && (
+                {/* Quality Row (if MP4) -> Opens Quality Picker Dropdown */}
+                {selectedFormat === 'mp4' ? (
                   <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, paddingHorizontal: 4 }}>
-                    <Text style={{ fontSize: 12, fontWeight: '600', color: colors.textSecondary }}>
-                      Quality
-                    </Text>
+                    <View>
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: colors.text }}>
+                        Video Quality
+                      </Text>
+                      <Text style={{ fontSize: 10, color: colors.textSecondary, marginTop: 1 }}>
+                        Estimated size: {estimatedSizeFormatted}
+                      </Text>
+                    </View>
                     <Pressable
-                      onPress={() => {
-                        const qualities: VideoQuality[] = ['1080p', '720p', '480p', '360p'];
-                        const nextIdx = (qualities.indexOf(selectedQuality) + 1) % qualities.length;
-                        setSelectedQuality(qualities[nextIdx]);
-                      }}
+                      onPress={openQualityModal}
+                      style={({ pressed }) => ({
+                        backgroundColor: colors.card,
+                        borderWidth: 1,
+                        borderColor: colors.cardBorder,
+                        paddingHorizontal: 12,
+                        paddingVertical: 8,
+                        borderRadius: 12,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        opacity: pressed ? 0.8 : 1,
+                      })}
+                    >
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: colors.text, marginRight: 6 }}>
+                        {qualityLabel}
+                      </Text>
+                      <ChevronDown size={14} color={colors.brandRed} />
+                    </Pressable>
+                  </View>
+                ) : (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, paddingHorizontal: 4 }}>
+                    <View>
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: colors.text }}>
+                        Audio Fidelity
+                      </Text>
+                      <Text style={{ fontSize: 10, color: colors.textSecondary, marginTop: 1 }}>
+                        Estimated size: {estimatedSizeFormatted}
+                      </Text>
+                    </View>
+                    <View
                       style={{
                         backgroundColor: colors.card,
                         borderWidth: 1,
@@ -399,21 +504,12 @@ export function PlaylistScreen({ route, navigation }: Props) {
                         paddingHorizontal: 12,
                         paddingVertical: 6,
                         borderRadius: 12,
-                        flexDirection: 'row',
-                        alignItems: 'center',
                       }}
                     >
-                      <Text style={{ fontSize: 12, fontWeight: '600', color: colors.text, marginRight: 6 }}>
-                        {selectedQuality === '1080p'
-                          ? '1080p Full HD'
-                          : selectedQuality === '720p'
-                          ? '720p HD'
-                          : selectedQuality === '480p'
-                          ? '480p SD'
-                          : '360p'}
+                      <Text style={{ fontSize: 12, fontWeight: '600', color: colors.textSecondary }}>
+                        320 kbps Extreme MP3
                       </Text>
-                      <ChevronDown size={14} color={colors.iconMuted} />
-                    </Pressable>
+                    </View>
                   </View>
                 )}
 
@@ -485,12 +581,183 @@ export function PlaylistScreen({ route, navigation }: Props) {
                 <Play size={16} fill="#FFFFFF" color="#FFFFFF" />
               </View>
               <Text style={{ fontSize: 15, fontWeight: '700', color: '#FFFFFF', letterSpacing: 0.3 }}>
-                Merge Selected ({selectedClips.length} Videos)
+                Merge Selected ({selectedClips.length} Videos • {estimatedSizeFormatted})
               </Text>
             </Pressable>
           </View>
         </View>
       ) : null}
+
+      {/* Quality Picker Modal */}
+      <Modal
+        visible={qualityModalVisible}
+        transparent
+        animationType="none"
+        onRequestClose={() => closeQualityModal()}
+      >
+        <Animated.View
+          style={[
+            styles.modalBackdrop,
+            {
+              backgroundColor: isDark ? 'rgba(0, 0, 0, 0.75)' : 'rgba(0, 0, 0, 0.5)',
+              opacity: modalBackdrop,
+            },
+          ]}
+        >
+          <Animated.View
+            style={[
+              styles.pickerCard,
+              {
+                backgroundColor: colors.surface,
+                borderColor: colors.cardBorder,
+                opacity: modalOpacity,
+                transform: [{ scale: modalScale }],
+              },
+            ]}
+          >
+            {/* Header */}
+            <View style={[styles.pickerHeader, { borderBottomColor: colors.divider }]}>
+              <View>
+                <Text style={[styles.pickerTitle, { color: colors.text }]}>Choose Video Quality</Text>
+                <Text style={{ fontSize: 11, color: colors.textSecondary, marginTop: 2 }}>
+                  Selected clips: {selectedDurationStr}
+                </Text>
+              </View>
+              <Pressable
+                onPress={() => closeQualityModal()}
+                style={styles.closeBtn}
+                accessibilityLabel="Close"
+              >
+                <X size={20} color={colors.textSecondary} />
+              </Pressable>
+            </View>
+
+            {/* Quality Options */}
+            <View>
+              {QUALITY_OPTIONS.map((opt) => {
+                const isSelected = selectedQuality === opt.value;
+                const estBytes = estimateVideoSizeBytes(selectedDurationSecs, opt.value);
+                const estFormatted = formatBytes(estBytes);
+
+                return (
+                  <Pressable
+                    key={opt.value}
+                    onPress={() => {
+                      setSelectedQuality(opt.value);
+                      closeQualityModal();
+                      notificationService.toast(`Video Quality set to ${opt.value}`, 'success');
+                    }}
+                    style={({ pressed }) => ({
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      paddingVertical: 12,
+                      paddingHorizontal: 12,
+                      borderRadius: 14,
+                      marginBottom: 6,
+                      backgroundColor: isSelected ? colors.cardSelectedBg : pressed ? colors.inputBg : 'transparent',
+                      borderWidth: isSelected ? 1 : 0,
+                      borderColor: colors.cardSelectedBorder,
+                    })}
+                  >
+                    <View style={{ flex: 1, marginRight: 12 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <Text
+                          style={{
+                            fontSize: 14,
+                            fontWeight: '700',
+                            color: isSelected ? colors.brandRed : colors.text,
+                          }}
+                        >
+                          {opt.label}
+                        </Text>
+                        <View
+                          style={{
+                            marginLeft: 8,
+                            paddingHorizontal: 6,
+                            paddingVertical: 1,
+                            borderRadius: 4,
+                            backgroundColor: colors.inputBg,
+                          }}
+                        >
+                          <Text style={{ fontSize: 10, fontWeight: '700', color: colors.textSecondary }}>
+                            ~{estFormatted}
+                          </Text>
+                        </View>
+                      </View>
+                      <Text style={{ fontSize: 11, color: colors.textSecondary, marginTop: 3 }}>
+                        {opt.desc}
+                      </Text>
+                    </View>
+
+                    {isSelected ? (
+                      <View
+                        style={{
+                          width: 22,
+                          height: 22,
+                          borderRadius: 11,
+                          backgroundColor: colors.brandRed,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        <Check size={13} color="#FFFFFF" strokeWidth={3} />
+                      </View>
+                    ) : (
+                      <View
+                        style={{
+                          width: 22,
+                          height: 22,
+                          borderRadius: 11,
+                          borderWidth: 1.5,
+                          borderColor: colors.inputBorder,
+                        }}
+                      />
+                    )}
+                  </Pressable>
+                );
+              })}
+            </View>
+          </Animated.View>
+        </Animated.View>
+      </Modal>
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  modalBackdrop: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+  },
+  pickerCard: {
+    width: '100%',
+    maxWidth: 360,
+    borderWidth: 1.5,
+    borderRadius: 24,
+    padding: 20,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.35,
+    shadowRadius: 20,
+    elevation: 16,
+  },
+  pickerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+  },
+  pickerTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    letterSpacing: -0.2,
+  },
+  closeBtn: {
+    padding: 4,
+  },
+});

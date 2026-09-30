@@ -9,12 +9,15 @@ import java.util.concurrent.atomic.AtomicBoolean
 /**
  * YtDlpDownloader (SOLID - Single Responsibility Principle)
  * Implements IDownloader using the native youtubedl-android library.
- * Streams real-time progress callbacks (percent, speed, ETA) for each clip.
+ * Streams clean, monotonic progress callbacks (percent, speed, ETA) for each clip.
+ * Never leaks raw console logs to user-facing progress snapshots.
  */
 class YtDlpDownloader : IDownloader {
 
     companion object {
         private const val TAG = "YtDlpDownloader"
+        private val SPEED_REGEX = Regex("""(?i)\b([0-9.]+\s*(?:[KMG]i?B/s|[KMG]bps))\b""")
+        private val ETA_REGEX = Regex("""(?i)\bETA\s+([0-9:]+)\b""")
     }
 
     private val isCancelled = AtomicBoolean(false)
@@ -23,6 +26,8 @@ class YtDlpDownloader : IDownloader {
     override fun downloadClips(
         clips: List<NativeVideoClip>,
         outputDir: File,
+        quality: String,
+        format: String,
         onProgress: (NativeProgressSnapshot) -> Unit
     ): List<File> {
         isCancelled.set(false)
@@ -32,6 +37,16 @@ class YtDlpDownloader : IDownloader {
 
         val downloadedFiles = mutableListOf<File>()
         val totalClips = clips.size
+        var overallHighWaterMark = 0.0
+        var lastKnownSpeed: String? = null
+
+        val isAudioOnly = format.equals("mp3", ignoreCase = true)
+        val maxResolutionHeight = when (quality.lowercase()) {
+            "720p" -> 720
+            "480p" -> 480
+            "360p" -> 360
+            else -> 1080
+        }
 
         for ((index, clip) in clips.withIndex()) {
             if (isCancelled.get()) break
@@ -41,11 +56,18 @@ class YtDlpDownloader : IDownloader {
 
             val outputFileTemplate = File(outputDir, "${clip.id}.%(ext)s").absolutePath
 
-            Log.i(TAG, "Starting download for clip ${index + 1}/$totalClips: ${clip.title}")
+            Log.i(TAG, "Starting download for clip ${index + 1}/$totalClips: ${clip.title} (Format: $format, Quality: $quality)")
 
             val request = YoutubeDLRequest(clip.url).apply {
                 addOption("-o", outputFileTemplate)
-                addOption("-f", "bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080][ext=mp4]/best")
+                if (isAudioOnly) {
+                    addOption("-f", "bestaudio/best")
+                    addOption("-x")
+                    addOption("--audio-format", "mp3")
+                    addOption("--audio-quality", "0")
+                } else {
+                    addOption("-f", "bestvideo[height<=$maxResolutionHeight][ext=mp4]+bestaudio[ext=m4a]/best[height<=$maxResolutionHeight][ext=mp4]/best")
+                }
                 addOption("--no-mtime")
                 addOption("--no-playlist")
                 addOption("--no-warnings")
@@ -56,13 +78,44 @@ class YtDlpDownloader : IDownloader {
                 addOption("--extractor-args", "youtube:player_client=android,web")
             }
 
+            var clipMaxPercent = 0.0
+
             try {
                 YoutubeDL.getInstance().execute(request, processId) { progressFloat, etaSeconds, line ->
                     if (isCancelled.get()) return@execute
 
-                    val progress = progressFloat.toDouble()
-                    val overall = (index.toDouble() / totalClips * 50.0) + (progress * 0.5 / totalClips)
-                    val etaFormatted = if (etaSeconds > 0) "${etaSeconds}s" else null
+                    // Extract download speed from log line if available
+                    if (line != null) {
+                        val speedMatch = SPEED_REGEX.find(line)?.groupValues?.get(1)
+                        if (!speedMatch.isNullOrBlank()) {
+                            lastKnownSpeed = speedMatch
+                        }
+                    }
+
+                    // Format ETA cleanly (e.g., "1m 45s" or "32s")
+                    val formattedEta = when {
+                        etaSeconds > 0 -> {
+                            val m = etaSeconds / 60
+                            val s = etaSeconds % 60
+                            if (m > 0) "${m}m ${s.toString().padStart(2, '0')}s" else "${s}s"
+                        }
+                        line != null -> {
+                            ETA_REGEX.find(line)?.groupValues?.get(1)
+                        }
+                        else -> null
+                    }
+
+                    // Smooth clip progress monotonically (handles video -> audio stream resets)
+                    val rawProgress = progressFloat.toDouble()
+                    clipMaxPercent = Math.max(clipMaxPercent, rawProgress)
+
+                    // Clip progress occupies its slice of the download phase (0.0 to 50.0%)
+                    val clipSlotPercent = 50.0 / totalClips
+                    val clipBasePercent = index.toDouble() * clipSlotPercent
+                    val currentOverall = clipBasePercent + (clipMaxPercent / 100.0 * clipSlotPercent)
+
+                    // Strictly monotonic overall progress
+                    overallHighWaterMark = Math.max(overallHighWaterMark, Math.min(50.0, currentOverall))
 
                     onProgress(
                         NativeProgressSnapshot(
@@ -70,22 +123,28 @@ class YtDlpDownloader : IDownloader {
                             currentItem = index + 1,
                             totalItems = totalClips,
                             currentVideoTitle = clip.title,
-                            overallPercent = overall,
-                            speed = line,
-                            eta = etaFormatted,
-                            message = "Downloading clip ${index + 1} of $totalClips (${progress.toInt()}%)"
+                            overallPercent = overallHighWaterMark,
+                            speed = lastKnownSpeed,
+                            eta = formattedEta,
+                            message = "Downloading clip ${index + 1} of $totalClips (${clipMaxPercent.toInt()}%)"
                         )
                     )
                 }
 
-                // Locate downloaded file (may be .mp4, .mkv, .webm)
-                val targetFile = outputDir.listFiles()?.firstOrNull { it.name.startsWith(clip.id) && !it.name.endsWith(".part") }
-                if (targetFile != null && targetFile.exists()) {
+                // Locate downloaded file (may be .mp4, .mkv, .webm, .mp3, .m4a)
+                val targetFile = outputDir.listFiles()?.firstOrNull {
+                    it.name.startsWith(clip.id) && !it.name.endsWith(".part") && !it.name.endsWith(".ytdl")
+                }
+
+                if (targetFile != null && targetFile.exists() && targetFile.length() > 0) {
                     downloadedFiles.add(targetFile)
                     Log.i(TAG, "Successfully downloaded clip ${index + 1}: ${targetFile.name} (${targetFile.length()} bytes)")
                 } else {
-                    throw RuntimeException("Downloaded file for clip ${clip.id} not found on disk.")
+                    throw RuntimeException("Downloaded file for clip ${clip.id} not found or empty.")
                 }
+
+                // Ensure high water mark reaches full slice for this clip
+                overallHighWaterMark = Math.max(overallHighWaterMark, (index + 1).toDouble() / totalClips * 50.0)
             } catch (e: Exception) {
                 if (isCancelled.get()) {
                     Log.i(TAG, "Download cancelled for clip ${clip.id}")

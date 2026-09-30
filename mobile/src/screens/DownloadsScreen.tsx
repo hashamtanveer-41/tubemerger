@@ -34,7 +34,14 @@ export function DownloadsScreen() {
     setLoading(true);
     try {
       const records = await historyStorageService.getHistory();
-      setItems(records);
+      const seen = new Set<string>();
+      const deduped = records.filter((r) => {
+        const key = r.filePath || r.fileName;
+        if (!key || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+      setItems(deduped);
     } catch {
       setItems([]);
     } finally {

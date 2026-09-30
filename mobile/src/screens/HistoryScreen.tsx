@@ -29,7 +29,14 @@ export function HistoryScreen({ navigation }: { navigation?: any }) {
     setLoading(true);
     try {
       const records = await historyStorageService.getHistory();
-      setHistoryItems(records);
+      const seen = new Set<string>();
+      const deduped = records.filter((r) => {
+        const key = r.filePath || r.fileName;
+        if (!key || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+      setHistoryItems(deduped);
     } catch {
       setHistoryItems([]);
     } finally {

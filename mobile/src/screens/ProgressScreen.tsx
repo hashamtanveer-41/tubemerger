@@ -9,7 +9,7 @@
  * - "CLIP QUEUE" list with index numbers ("01", "02"), titles, durations, and active pulsating status indicators
  */
 
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -62,6 +62,7 @@ export function ProgressScreen({ route, navigation }: Props) {
   const [classifiedError, setClassifiedError] = useState<ClassifiedError | null>(null);
   const [showDetails, setShowDetails] = useState<boolean>(false);
   const hasStartedRef = useRef<boolean>(false);
+  const hasHandledDoneRef = useRef<boolean>(false);
 
   const startPipeline = useCallback(() => {
     setClassifiedError(null);
@@ -120,20 +121,39 @@ export function ProgressScreen({ route, navigation }: Props) {
 
   useEffect(() => {
     const unsub = mergeService.subscribeProgress((event: ProgressEvent) => {
-      setProgress((prev) => ({
-        ...prev,
-        ...event,
-        // preserve non-empty speed & eta
-        speed: event.speed || prev.speed || '352.4KB/s',
-        eta: event.eta || prev.eta || '3m 04s',
-      }));
+      setProgress((prev) => {
+        const rawPercent = typeof event.overall_percent === 'number' ? event.overall_percent : prev.overall_percent;
+        const monotonicPercent = Math.max(prev.overall_percent || 0, Math.min(100, Math.round(rawPercent)));
+
+        // Filter out raw stdout lines (e.g. "[youtube] ...", "[download] Destination...")
+        let validSpeed = prev.speed;
+        if (event.speed && !event.speed.includes('[') && !event.speed.includes(']')) {
+          validSpeed = event.speed;
+        }
+
+        let validEta = prev.eta;
+        if (event.eta && !event.eta.includes('[') && !event.eta.includes(']')) {
+          validEta = event.eta;
+        }
+
+        return {
+          ...prev,
+          ...event,
+          overall_percent: monotonicPercent,
+          speed: validSpeed,
+          eta: validEta,
+        };
+      });
 
       if (event.status === 'done') {
+        if (hasHandledDoneRef.current) return;
+        hasHandledDoneRef.current = true;
+
         telemetryService.trackMergeCompleted(0, totalClips);
         const outputPath = event.output_file || '/sdcard/Android/data/com.tubemerger.app/files/TubeMerger/merged_output.mp4';
         const fileName = outputPath.split('/').pop() || 'merged_output.mp4';
 
-        // Persist completed merge into local history store
+        // Persist completed merge into local history store (guaranteed exactly once)
         historyStorageService
           .saveRecord({
             title: playlistTitle || 'Merged Video',
@@ -171,14 +191,21 @@ export function ProgressScreen({ route, navigation }: Props) {
     };
   }, [payload, playlistTitle, totalClips, navigation, startPipeline]);
 
-  // Clean speed and ETA text
-  const cleanSpeed = (progress.speed || '352.4KB/s')
-    .replace(/^at\s+/, '')
-    .trim();
-  const cleanEta = (progress.eta || '3m 04s')
-    .replace(/^ETA:\s*/, '')
-    .replace(/left$/, '')
-    .trim();
+  // Clean speed and ETA text - strictly protect against raw logs
+  const cleanSpeed = useMemo(() => {
+    if (!progress.speed || progress.speed.includes('[') || progress.speed.includes(']')) {
+      return progress.status === 'downloading' ? 'Downloading...' : 'Processing...';
+    }
+    return progress.speed.replace(/^at\s+/, '').trim();
+  }, [progress.speed, progress.status]);
+
+  const cleanEta = useMemo(() => {
+    if (!progress.eta || progress.eta.includes('[') || progress.eta.includes(']')) {
+      return 'Estimating...';
+    }
+    const sanitized = progress.eta.replace(/^ETA:\s*/, '').replace(/left$/, '').trim();
+    return sanitized.endsWith('left') ? sanitized : `${sanitized} left`;
+  }, [progress.eta]);
 
   const currentClipIndex = Math.max(1, progress.current_item || 1);
   const activeClip: VideoClip | undefined = payload.clips?.[currentClipIndex - 1] || payload.clips?.[0];

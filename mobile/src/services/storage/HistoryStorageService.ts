@@ -46,10 +46,20 @@ class HistoryStorageService implements IHistoryStorageService {
       try {
         await TubeMergerModule.saveHistoryItem(JSON.stringify(fullRecord));
       } catch {
-        this.inMemoryFallback.unshift(fullRecord);
+        this.inMemoryFallback = [
+          fullRecord,
+          ...this.inMemoryFallback.filter(
+            (item) => item.filePath !== fullRecord.filePath && item.fileName !== fullRecord.fileName
+          ),
+        ];
       }
     } else {
-      this.inMemoryFallback.unshift(fullRecord);
+      this.inMemoryFallback = [
+        fullRecord,
+        ...this.inMemoryFallback.filter(
+          (item) => item.filePath !== fullRecord.filePath && item.fileName !== fullRecord.fileName
+        ),
+      ];
     }
 
     return fullRecord;
