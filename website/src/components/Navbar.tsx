@@ -95,14 +95,16 @@ export default function Navbar({ onOpenDownload }: NavbarProps) {
       className="sticky top-0 z-40 border-b border-white/[0.08]"
       style={{ backgroundColor: "#090A0F" }}
     >
-      <div className="mx-auto flex h-[76px] max-w-[1280px] items-center justify-between px-6 sm:px-10">
-        <Logo />
+      <div className="mx-auto flex h-[76px] max-w-[1280px] items-center justify-between px-6 sm:px-10 gap-4">
+        <div className="shrink-0">
+          <Logo />
+        </div>
 
-        {/* Center Nav Links */}
+        {/* Center Nav Links - flex layout with flex-1 prevents collision */}
         <nav
           role="navigation"
           aria-label="Main navigation"
-          className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-10 md:flex"
+          className="hidden lg:flex items-center justify-center gap-8 xl:gap-10 flex-1 px-4"
         >
           {navLinks.map((link) => (
             <a
@@ -111,7 +113,7 @@ export default function Navbar({ onOpenDownload }: NavbarProps) {
               {...(link.external
                 ? { target: "_blank", rel: "noopener noreferrer" }
                 : {})}
-              className="font-sans text-[14px] text-white/60 transition-colors hover:text-white"
+              className="font-sans text-[14px] text-white/60 transition-colors hover:text-white whitespace-nowrap"
             >
               {link.label}
             </a>
@@ -119,19 +121,19 @@ export default function Navbar({ onOpenDownload }: NavbarProps) {
         </nav>
 
         {/* Action Buttons */}
-        <div className="hidden sm:flex items-center gap-3">
+        <div className="hidden sm:flex items-center gap-3 shrink-0">
           <a
             href="https://github.com/hashamtanveer-41/tubemerger"
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.03] h-10 px-4 text-[13.5px] font-sans font-medium text-white/80 hover:text-white hover:border-white/30 hover:bg-white/[0.06] transition-all"
+            className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.03] h-10 px-4 text-[13.5px] font-sans font-medium text-white/80 hover:text-white hover:border-white/30 hover:bg-white/[0.06] transition-all whitespace-nowrap"
           >
             <GitHubIcon className="h-4 w-4" />
             <span>GitHub</span>
           </a>
           <button
             onClick={onOpenDownload}
-            className="inline-flex items-center justify-center rounded-full bg-coral h-10 px-5 text-[14px] font-display font-semibold text-white shadow-[0_8px_24px_-8px_rgba(255,59,48,0.65)] hover:brightness-110 active:translate-y-0 transition-all duration-200 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60"
+            className="inline-flex items-center justify-center rounded-full bg-coral h-10 px-5 text-[14px] font-display font-semibold text-white shadow-[0_8px_24px_-8px_rgba(255,59,48,0.65)] hover:brightness-110 active:translate-y-0 transition-all duration-200 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60 whitespace-nowrap"
           >
             Download App
           </button>
@@ -141,7 +143,7 @@ export default function Navbar({ onOpenDownload }: NavbarProps) {
         <button
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
           aria-label="Toggle navigation menu"
-          className="flex md:hidden p-2 text-white/60 hover:text-white cursor-pointer"
+          className="flex lg:hidden p-2 text-white/60 hover:text-white cursor-pointer"
         >
           <svg
             viewBox="0 0 24 24"
@@ -169,7 +171,7 @@ export default function Navbar({ onOpenDownload }: NavbarProps) {
 
       {/* Mobile menu */}
       {mobileMenuOpen && (
-        <div className="md:hidden border-b border-white/[0.08] bg-[#090A0F] px-6 py-4 space-y-3">
+        <div className="lg:hidden border-b border-white/[0.08] bg-[#090A0F] px-6 py-4 space-y-3">
           {navLinks.map((link) => (
             <a
               key={link.label}

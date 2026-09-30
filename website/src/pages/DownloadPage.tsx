@@ -216,8 +216,6 @@ export default function DownloadPage({
 }: DownloadPageProps) {
   const [downloadedState, setDownloadedState] =
     useState<DownloadedState | null>(null)
-  const [redirectSeconds, setRedirectSeconds] = useState<number>(5)
-  const [isRedirectPaused, setIsRedirectPaused] = useState<boolean>(false)
   const [detectedOS, setDetectedOS] = useState<DetectedOS>("win")
   const [copiedTerminal, setCopiedTerminal] = useState<boolean>(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false)
@@ -227,32 +225,6 @@ export default function DownloadPage({
     window.scrollTo(0, 0)
     setDetectedOS(detectUserOS())
   }, [])
-
-  // Auto-redirect to community section after download
-  useEffect(() => {
-    if (!downloadedState || isRedirectPaused) return
-
-    if (redirectSeconds <= 0) {
-      if (onNavigateToCommunity) {
-        onNavigateToCommunity()
-      } else {
-        onNavigateHome()
-      }
-      return
-    }
-
-    const timer = setTimeout(() => {
-      setRedirectSeconds((prev) => prev - 1)
-    }, 1000)
-
-    return () => clearTimeout(timer)
-  }, [
-    downloadedState,
-    redirectSeconds,
-    isRedirectPaused,
-    onNavigateToCommunity,
-    onNavigateHome,
-  ])
 
   // Build platform data from live release (or static fallback)
   const platforms: Record<
@@ -523,21 +495,6 @@ export default function DownloadPage({
                 </button>
               </div>
 
-              {!isRedirectPaused ? (
-                <div className="text-[12.5px] text-white/40 pt-1">
-                  Redirecting to community in {redirectSeconds}s •{" "}
-                  <button
-                    onClick={() => setIsRedirectPaused(true)}
-                    className="text-coral hover:underline cursor-pointer"
-                  >
-                    Stay on page
-                  </button>
-                </div>
-              ) : (
-                <div className="text-[12.5px] text-white/30 pt-1">
-                  Auto-redirect paused
-                </div>
-              )}
 
               <div className="pt-2 border-t border-white/[0.06]">
                 <button
