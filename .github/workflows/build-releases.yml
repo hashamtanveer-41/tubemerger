@@ -149,9 +149,53 @@ jobs:
             dist/*.tar.gz
             dist/*.exe
 
+  build-android:
+    name: Build Android (APK)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Install Mobile Dependencies
+        working-directory: mobile
+        run: npm ci
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Build Android Release APK
+        working-directory: mobile/android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease
+
+      - name: Prepare APK Asset
+        run: |
+          mkdir -p dist
+          cp mobile/android/app/build/outputs/apk/release/app-release.apk dist/TubeMerger.apk
+
+      - name: Upload Android Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-packages
+          path: dist/TubeMerger.apk
+
   release:
     name: Publish Release Packages
-    needs: build
+    needs: [build, build-android]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
     steps:
@@ -175,7 +219,8 @@ jobs:
             "assets": {
               "windows": "${BASE}/TubeMerge-Setup.exe",
               "macos": "${BASE}/TubeMerge-macOS-x64.zip",
-              "linux": "${BASE}/TubeMerge-Linux-x64.tar.gz"
+              "linux": "${BASE}/TubeMerge-Linux-x64.tar.gz",
+              "android": "${BASE}/TubeMerger.apk"
             },
             "release_url": "https://github.com/hashamtanveer-41/tubemerger/releases/tag/${TAG}"
           }
@@ -191,6 +236,7 @@ jobs:
             artifacts/*.zip
             artifacts/*.tar.gz
             artifacts/*.exe
+            artifacts/*.apk
             artifacts/version.json
           draft: false
           prerelease: false
