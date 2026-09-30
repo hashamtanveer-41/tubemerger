@@ -18,6 +18,7 @@ export interface ReleaseData {
     win: PlatformRelease;
     mac: PlatformRelease;
     linux: PlatformRelease;
+    android: PlatformRelease;
   };
 }
 
@@ -50,6 +51,13 @@ export const STATIC_RELEASE: ReleaseData = {
       versionInfo: 'Ubuntu / Debian / Fedora • 64-bit',
       file: 'TubeMerge-Linux-x64.tar.gz',
       url: `${BASE_URL}/TubeMerge-Linux-x64.tar.gz`,
+    },
+    android: {
+      name: 'Android',
+      heading: 'Download for Android',
+      versionInfo: 'Android 8.0+ (ARM64 & ARMv7) • APK',
+      file: 'TubeMerger.apk',
+      url: `${BASE_URL}/TubeMerger.apk`,
     },
   },
 };

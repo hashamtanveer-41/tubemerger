@@ -119,7 +119,7 @@ export default function Hero({ onOpenDownload }: HeroProps) {
           className="rise-in mt-6 font-sans text-[14px] font-normal text-white/60 tracking-normal"
           style={{ "--rise-delay": "460ms" } as React.CSSProperties}
         >
-          Built for all operating systems • 100% Free & Open Source • Fully
+          Built for Windows, macOS, Linux & Android • 100% Free & Open Source • Fully
           Offline
         </p>
       </div>

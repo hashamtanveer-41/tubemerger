@@ -100,7 +100,20 @@ function UbuntuIcon({ className = "" }: { className?: string }) {
       className={className}
       aria-hidden="true"
     >
-      <path d="M17.61.455a3.41 3.41 0 0 0-3.41 3.41 3.41 3.41 0 0 0 3.41 3.41 3.41 3.41 0 0 0 3.41-3.41 3.41 3.41 0 0 0-3.41-3.41zM12.92.8C8.923.777 5.137 2.941 3.148 6.451a4.5 4.5 0 0 1 .26-.007 4.92 4.92 0 0 1 2.585.737A8.316 8.316 0 0 1 12.688 3.6 4.944 4.944 0 0 1 13.723.834 11.008 11.008 0 0 0 12.92.8zm9.226 4.994a4.915 4.915 0 0 1-1.918 2.246 8.36 8.36 0 0 1-.273 8.303 4.89 4.89 0 0 1 1.632 2.54 11.156 11.156 0 0 0 .559-13.089zM3.41 7.932A3.41 3.41 0 0 0 0 11.342a3.41 3.41 0 0 0 3.41 3.409 3.41 3.41 0 0 0 3.41-3.41 3.41 3.41 0 0 0-3.41-3.41zm2.027 7.866a4.908 4.908 0 0 1-2.915.358 11.1 11.1 0 0 0 7.991 6.698 11.234 11.234 0 0 0 2.422.249 4.879 4.879 0 0 1-.999-2.85 8.484 8.484 0 0 1-.836-.136 8.304 8.304 0 0 1-5.663-4.32zm11.405.928a3.41 3.41 0 0 0-3.41 3.41 3.41 3.41 0 0 0 3.41 3.41 3.41 3.41 0 0 0 3.41-3.41 3.41 3.41 0 0 0-3.41-3.41z" />
+      <path d="M17.61.455a3.41 3.41 0 0 0-3.41 3.41 3.41 3.41 0 0 0 3.41 3.41 3.41 3.41 0 0 0 3.41-3.41zM12.92.8C8.923.777 5.137 2.941 3.148 6.451a4.5 4.5 0 0 1 .26-.007 4.92 4.92 0 0 1 2.585.737A8.316 8.316 0 0 1 12.688 3.6 4.944 4.944 0 0 1 13.723.834 11.008 11.008 0 0 0 12.92.8zm9.226 4.994a4.915 4.915 0 0 1-1.918 2.246 8.36 8.36 0 0 1-.273 8.303 4.89 4.89 0 0 1 1.632 2.54 11.156 11.156 0 0 0 .559-13.089zM3.41 7.932A3.41 3.41 0 0 0 0 11.342a3.41 3.41 0 0 0 3.41 3.409 3.41 3.41 0 0 0 3.41-3.41 3.41 3.41 0 0 0-3.41-3.41zm2.027 7.866a4.908 4.908 0 0 1-2.915.358 11.1 11.1 0 0 0 7.991 6.698 11.234 11.234 0 0 0 2.422.249 4.879 4.879 0 0 1-.999-2.85 8.484 8.484 0 0 1-.836-.136 8.304 8.304 0 0 1-5.663-4.32zm11.405.928a3.41 3.41 0 0 0-3.41 3.41 3.41 3.41 0 0 0 3.41 3.41 3.41 3.41 0 0 0 3.41-3.41 3.41 3.41 0 0 0-3.41-3.41z" />
+    </svg>
+  )
+}
+
+function AndroidIcon({ className = "" }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      className={className}
+      aria-hidden="true"
+    >
+      <path d="M17.523 15.3414c-.5511 0-.9993-.4486-.9993-.9997s.4482-.9993.9993-.9993c.551 0 .9993.4482.9993.9993.0001.5511-.4483.9997-.9993.9997m-11.046 0c-.5511 0-.9993-.4486-.9993-.9997s.4482-.9993.9993-.9993c.5511 0 .9993.4482.9993.9993 0 .5511-.4482.9997-.9993.9997m11.4045-6.02l1.9973-3.4592a.416.416 0 0 0-.1521-.5676.416.416 0 0 0-.5676.1521l-2.0223 3.503C15.5902 8.4116 13.8533 8.082 12 8.082s-3.5902.3296-5.1368.8677L4.8409 5.4467a.4161.4161 0 0 0-.5677-.1521.4157.4157 0 0 0-.1521.5676l1.9973 3.4592C2.6889 11.1867.3432 14.6589 0 18.761h24c-.3432-4.1021-2.6889-7.5743-6.1185-9.4396" />
     </svg>
   )
 }
@@ -174,11 +187,12 @@ function CopyIcon({ className = "" }: { className?: string }) {
   )
 }
 
-type DetectedOS = "win" | "mac" | "linux"
+type DetectedOS = "win" | "mac" | "linux" | "android"
 
 function detectUserOS(): DetectedOS {
   if (typeof window === "undefined" || !navigator) return "win"
   const ua = (navigator.userAgent || "").toLowerCase()
+  if (ua.includes("android")) return "android"
   if (ua.includes("win")) return "win"
   if (ua.includes("mac") || ua.includes("darwin")) return "mac"
   if (ua.includes("linux") || ua.includes("x11") || ua.includes("ubuntu")) return "linux"
@@ -276,6 +290,14 @@ export default function DownloadPage({
       file: release.platforms.linux.file,
       url: release.platforms.linux.url,
     },
+    android: {
+      name: release.platforms.android.name,
+      heading: release.platforms.android.heading,
+      versionInfo: release.platforms.android.versionInfo,
+      icon: <AndroidIcon className="h-6 w-6 text-[#3DDC84]" />,
+      file: release.platforms.android.file,
+      url: release.platforms.android.url,
+    },
   }
 
   // Immediate browser download execution
@@ -330,10 +352,12 @@ export default function DownloadPage({
 
   const alternativeOSLabel =
     detectedOS === "linux"
-      ? "Windows & macOS"
+      ? "Windows, macOS & Android"
       : detectedOS === "mac"
-        ? "Windows & Linux"
-        : "macOS & Linux"
+        ? "Windows, Linux & Android"
+        : detectedOS === "android"
+          ? "Windows, macOS & Linux"
+          : "macOS, Linux & Android"
 
   return (
     <div className="min-h-screen bg-[#090A0F] text-white selection:bg-coral/30 selection:text-white flex flex-col font-sans">
@@ -530,7 +554,7 @@ export default function DownloadPage({
           /* ───────────────────────────────────────────────────────────────────────
              OPTIMIZED DOWNLOAD EXPERIENCE (OS Hero CTA + 3 Grid + Terminal)
              ─────────────────────────────────────────────────────────────────────── */
-          <div className="mx-auto max-w-[960px] w-full space-y-12">
+          <div className="mx-auto max-w-[1040px] w-full space-y-12">
             {/* 1. OS Auto-Detection Hero */}
             <div className="text-center max-w-[680px] mx-auto space-y-4">
               <h1 className="text-[34px] sm:text-[44px] font-bold text-white tracking-tight leading-tight">
@@ -538,7 +562,7 @@ export default function DownloadPage({
               </h1>
 
               <p className="text-[15px] sm:text-[16px] text-white/65 max-w-[540px] mx-auto leading-relaxed">
-                100% Free &amp; open-source desktop app for Windows, macOS, and Linux.
+                100% Free &amp; open-source app for Windows, macOS, Linux, and Android.
                 Merge full YouTube playlists offline with zero cloud processing.
               </p>
 
@@ -569,9 +593,9 @@ export default function DownloadPage({
               </div>
             </div>
 
-            {/* 2. Platform Selector Grid (3 Manual Options) */}
+            {/* 2. Platform Selector Grid (4 Manual Options) */}
             <div className="space-y-4">
-              <div className="flex items-center justify-between max-w-[920px] mx-auto px-1">
+              <div className="flex items-center justify-between max-w-[1040px] mx-auto px-1">
                 <span className="text-[13px] font-medium uppercase tracking-wider text-white/40">
                   All Platforms
                 </span>
@@ -580,7 +604,7 @@ export default function DownloadPage({
                 </span>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-[920px] mx-auto w-full">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 max-w-[1040px] mx-auto w-full">
                 {/* Windows Button */}
                 <button
                   onClick={() =>
@@ -673,11 +697,42 @@ export default function DownloadPage({
                     </div>
                   </div>
                 </button>
+
+                {/* Android Button */}
+                <button
+                  onClick={() =>
+                    triggerDownload(
+                      platforms.android.name,
+                      platforms.android.file,
+                      platforms.android.url,
+                    )
+                  }
+                  className={cardButtonClass}
+                >
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-black/40 border border-white/10 shrink-0 group-hover:scale-105 transition-transform">
+                    {platforms.android.icon}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="text-[15px] font-bold text-white group-hover:text-coral transition-colors truncate">
+                        {platforms.android.heading}
+                      </div>
+                      {detectedOS === "android" && (
+                        <span className="text-[10.5px] font-medium tracking-wide uppercase px-2 py-0.5 rounded bg-coral/15 text-coral border border-coral/30 shrink-0">
+                          Detected
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-[13px] text-white/50 mt-0.5">
+                      {platforms.android.versionInfo}
+                    </div>
+                  </div>
+                </button>
               </div>
             </div>
 
             {/* 3. Power User Terminal Option */}
-            <div className="max-w-[920px] mx-auto w-full space-y-2.5">
+            <div className="max-w-[1040px] mx-auto w-full space-y-2.5">
               <div className="flex items-center justify-between px-1">
                 <div className="flex items-center gap-2 text-[13.5px] font-medium text-white/70">
                   <TerminalIcon className="h-4 w-4 text-white/50" />

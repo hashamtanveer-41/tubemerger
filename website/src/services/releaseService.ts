@@ -75,6 +75,7 @@ export async function fetchLatestRelease(): Promise<ReleaseData> {
     const winSize = formatAssetSize(assets, 'TubeMerge-Setup.exe');
     const macSize = formatAssetSize(assets, 'TubeMerge-macOS-x64.zip');
     const linuxSize = formatAssetSize(assets, 'TubeMerge-Linux-x64.tar.gz');
+    const androidSize = formatAssetSize(assets, 'TubeMerger.apk');
 
     const data: ReleaseData = {
       version: tag,
@@ -100,6 +101,13 @@ export async function fetchLatestRelease(): Promise<ReleaseData> {
           versionInfo: `v${tag} • Ubuntu / Debian / Fedora${linuxSize ? ` • ${linuxSize}` : ''}`,
           file: 'TubeMerge-Linux-x64.tar.gz',
           url: `${BASE_URL}/TubeMerge-Linux-x64.tar.gz`,
+        },
+        android: {
+          name: 'Android',
+          heading: 'Download for Android',
+          versionInfo: `v${tag} • Android 8.0+ (APK)${androidSize ? ` • ${androidSize}` : ''}`,
+          file: 'TubeMerger.apk',
+          url: `${BASE_URL}/TubeMerger.apk`,
         },
       },
     };
