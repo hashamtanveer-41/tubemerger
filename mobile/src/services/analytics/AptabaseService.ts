@@ -9,6 +9,8 @@ import { ITelemetryService, TelemetryProps } from './ITelemetryService';
 import { bucketClips, bucketDuration, bucketSize } from './bucketing';
 import { categorizeError, isResolvable } from './classifier';
 
+export const DEFAULT_TELEMETRY_APP_KEY = 'A-EU-1063594697';
+
 export class AptabaseService implements ITelemetryService {
   private static instance: AptabaseService;
   private isInitialized = false;
@@ -22,13 +24,15 @@ export class AptabaseService implements ITelemetryService {
     return AptabaseService.instance;
   }
 
-  init(appKey: string): void {
-    if (this.isInitialized || !appKey) {
+  init(appKey: string = DEFAULT_TELEMETRY_APP_KEY): void {
+    if (this.isInitialized) {
       return;
     }
 
+    const keyToUse = appKey || DEFAULT_TELEMETRY_APP_KEY;
+
     try {
-      init(appKey);
+      init(keyToUse, { enableCrashReporting: true });
       this.isInitialized = true;
     } catch {
       // Telemetry initialization must fail silently

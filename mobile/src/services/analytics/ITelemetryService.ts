@@ -6,7 +6,7 @@
 export type TelemetryProps = Record<string, string | number | boolean>;
 
 export interface ITelemetryService {
-  init(appKey: string): void;
+  init(appKey?: string): void;
   trackAppStarted(): void;
   trackPlaylistInspected(clipCount: number, playlistSizeMb?: number): void;
   trackMergeStarted(clipCount: number, preset: string, playlistSizeMb?: number): void;

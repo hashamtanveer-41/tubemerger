@@ -18,7 +18,7 @@ LogBox.ignoreAllLogs(true);
 export default function App() {
   useEffect(() => {
     // Initialize privacy-friendly telemetry on cold launch
-    telemetryService.init('A-EU-TUBEMERGER-APP');
+    telemetryService.init('A-EU-1063594697');
     telemetryService.trackAppStarted();
   }, []);
 
