@@ -47,15 +47,21 @@ export function ProgressScreen({ route, navigation }: Props) {
   const { colors, isDark } = useTheme();
   const { payload, playlistTitle, totalClips } = route.params;
 
-  const [progress, setProgress] = useState<ProgressEvent>({
-    status: 'downloading',
-    current_item: 1,
-    total_items: totalClips,
-    current_video_title: payload.clips?.[0]?.title || 'Preparing download...',
-    overall_percent: 0,
-    message: 'Initializing pipeline...',
-    speed: '352.4KB/s',
-    eta: '3m 04s',
+  const [progress, setProgress] = useState<ProgressEvent>(() => {
+    const currentActive = mergeService.getActiveJob?.();
+    if (currentActive?.progress) {
+      return currentActive.progress;
+    }
+    return {
+      status: 'downloading',
+      current_item: 1,
+      total_items: totalClips,
+      current_video_title: payload.clips?.[0]?.title || 'Preparing download...',
+      overall_percent: 0,
+      message: 'Initializing pipeline...',
+      speed: '352.4KB/s',
+      eta: '3m 04s',
+    };
   });
 
   const [cancelling, setCancelling] = useState<boolean>(false);
@@ -183,7 +189,17 @@ export function ProgressScreen({ route, navigation }: Props) {
 
     if (!hasStartedRef.current) {
       hasStartedRef.current = true;
-      startPipeline();
+      const currentActive = mergeService.getActiveJob?.();
+      if (currentActive?.jobId) {
+        if (currentActive.progress) {
+          setProgress((prev) => ({
+            ...prev,
+            ...currentActive.progress,
+          }));
+        }
+      } else {
+        startPipeline();
+      }
     }
 
     return () => {

@@ -49,6 +49,7 @@ import { updateService, UpdateInfo } from '../services/updates';
 import { getNativeClipboard } from '../services/clipboard';
 import { notificationService } from '../services/notification';
 import { useTheme } from '../theme';
+import { UpdatePromptModal } from '../components';
 
 export function HomeScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -58,19 +59,41 @@ export function HomeScreen() {
   const [validationError, setValidationError] = useState<string | null>(null);
   const [activeError, setActiveError] = useState<ClassifiedError | null>(null);
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
+  const [showUpdateModal, setShowUpdateModal] = useState<boolean>(false);
   const [cardLayout, setCardLayout] = useState<{ width: number; height: number } | null>(null);
   const inputRef = useRef<any>(null);
 
   useEffect(() => {
     updateService
       .checkForUpdates()
-      .then((info) => {
+      .then(async (info) => {
         if (info.hasUpdate) {
           setUpdateInfo(info);
+          const shouldPrompt = await updateService.shouldPromptUpdate(info);
+          if (shouldPrompt) {
+            setShowUpdateModal(true);
+          }
         }
       })
       .catch(() => { });
   }, []);
+
+  const handleDismissUpdate = async () => {
+    if (updateInfo && !updateInfo.isForceUpdate) {
+      await updateService.markUpdateDismissed(updateInfo.latestVersion);
+      setShowUpdateModal(false);
+    }
+  };
+
+  const handlePerformUpdate = async () => {
+    if (updateInfo?.downloadUrl) {
+      await updateService.openDownloadPage(updateInfo.downloadUrl);
+      if (!updateInfo.isForceUpdate) {
+        await updateService.markUpdateDismissed(updateInfo.latestVersion);
+        setShowUpdateModal(false);
+      }
+    }
+  };
 
   const handlePaste = async () => {
     const text = await getNativeClipboard();
@@ -252,21 +275,22 @@ export function HomeScreen() {
           }}
         >
           {/* Background Gradient */}
-          <Svg
-            style={StyleSheet.absoluteFill}
-            width={cardLayout ? cardLayout.width : '100%'}
-            height={cardLayout ? cardLayout.height : '100%'}
-          >
-            <Defs>
-              <LinearGradient id="heroGradient" x1="0%" y1="0%" x2="100%" y2="85%">
-                <Stop offset="0%" stopColor="#431E54" />
-                <Stop offset="30%" stopColor="#4F1D4B" />
-                <Stop offset="65%" stopColor="#7E1A33" />
-                <Stop offset="100%" stopColor="#A81C26" />
-              </LinearGradient>
-            </Defs>
-            <Rect width="100%" height="100%" fill="url(#heroGradient)" />
-          </Svg>
+          <View style={StyleSheet.absoluteFill} pointerEvents="none">
+            <Svg
+              width={cardLayout ? cardLayout.width : '100%'}
+              height={cardLayout ? cardLayout.height : '100%'}
+            >
+              <Defs>
+                <LinearGradient id="heroGradient" x1="0%" y1="0%" x2="100%" y2="85%">
+                  <Stop offset="0%" stopColor="#431E54" />
+                  <Stop offset="30%" stopColor="#4F1D4B" />
+                  <Stop offset="65%" stopColor="#7E1A33" />
+                  <Stop offset="100%" stopColor="#A81C26" />
+                </LinearGradient>
+              </Defs>
+              <Rect width="100%" height="100%" fill="url(#heroGradient)" />
+            </Svg>
+          </View>
 
           <View style={{ paddingHorizontal: 20, paddingTop: 32, paddingBottom: 28, alignItems: 'center' }}>
             {/* Top Squiggle Wave Doodle */}
@@ -602,6 +626,13 @@ export function HomeScreen() {
           </View>
         </View>
       </ScrollView>
+
+      <UpdatePromptModal
+        visible={showUpdateModal}
+        updateInfo={updateInfo}
+        onDismiss={handleDismissUpdate}
+        onUpdate={handlePerformUpdate}
+      />
     </View>
   );
 }

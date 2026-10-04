@@ -10,6 +10,7 @@ import { LogBox } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AppNavigator } from './src/navigation';
 import { telemetryService } from './src/services/analytics';
+import { settingsService } from './src/services/settings';
 import { NotificationModal } from './src/components';
 import { ThemeProvider } from './src/theme';
 
@@ -17,7 +18,8 @@ LogBox.ignoreAllLogs(true);
 
 export default function App() {
   useEffect(() => {
-    // Initialize privacy-friendly telemetry on cold launch
+    // Load persisted settings and initialize privacy-friendly telemetry on cold launch
+    settingsService.loadPersistedSettings();
     telemetryService.init('A-EU-1063594697');
     telemetryService.trackAppStarted();
   }, []);

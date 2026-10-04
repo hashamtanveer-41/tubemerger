@@ -7,7 +7,7 @@ import {
   StatusBar,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { CheckCircle2, Share2, RotateCcw, History } from 'lucide-react-native';
+import { CheckCircle2, Share2, RotateCcw, Download } from 'lucide-react-native';
 import { RootStackParamList } from '../navigation/types';
 import { Header, Button, Card, Badge } from '../components';
 import { notificationService } from '../services/notification';
@@ -133,10 +133,10 @@ export function SuccessScreen({ route, navigation }: Props) {
           />
 
           <Button
-            label="View History"
+            label="View Downloads"
             onPress={() => navigation.navigate('History')}
             variant="ghost"
-            icon={<History size={16} color={colors.textSecondary} />}
+            icon={<Download size={16} color={colors.textSecondary} />}
           />
         </View>
       </ScrollView>

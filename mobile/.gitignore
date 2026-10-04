@@ -67,6 +67,11 @@ yarn-error.log
 /coverage
 screen*.png
 
+# Tools & Bundles
+tools/
+android/app/src/main/assets/
+*.bundle
+
 # Yarn
 .yarn/*
 !.yarn/patches
@@ -74,3 +79,4 @@ screen*.png
 !.yarn/releases
 !.yarn/sdks
 !.yarn/versions
+

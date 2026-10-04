@@ -1,28 +1,41 @@
 /**
  * TubeMerger Mobile - MainTabs
  * Bottom Tab Navigator:
- * - 4 Tabs: Home, Downloads, History, Settings
- * - Pure AMOLED dark bar (#0A0A0D)
- * - Brand red active highlight with subtle underline indicator
+ * - 3 Visible Tabs: Home, Downloads, Settings
+ * - Merges Downloads & History into a unified Downloads Tab
+ * - Live active download indicator badge on Downloads icon
+ * - Pure AMOLED dark bar (#0A0A0D) with brand red active highlight
  */
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Home, Download, History, Settings } from 'lucide-react-native';
+import { Home, Download, Settings } from 'lucide-react-native';
 import { MainTabParamList } from './types';
 import {
   HomeScreen,
   DownloadsScreen,
-  HistoryScreen,
   SettingsScreen,
 } from '../screens';
 import { useTheme } from '../theme';
+import { mergeService } from '../services/engine';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
 export function MainTabs() {
   const { colors } = useTheme();
+  const [hasActiveJob, setHasActiveJob] = useState<boolean>(() => {
+    const job = mergeService.getActiveJob ? mergeService.getActiveJob() : null;
+    return Boolean(job && job.progress?.status !== 'done' && job.progress?.status !== 'error');
+  });
+
+  useEffect(() => {
+    if (mergeService.subscribeActiveJob) {
+      return mergeService.subscribeActiveJob((job) => {
+        setHasActiveJob(Boolean(job && job.progress?.status !== 'done' && job.progress?.status !== 'error'));
+      });
+    }
+  }, []);
 
   return (
     <Tab.Navigator
@@ -70,7 +83,10 @@ export function MainTabs() {
         options={{
           tabBarIcon: ({ focused }) => (
             <View style={styles.tabItem}>
-              <Download size={20} color={focused ? colors.brandRed : colors.tabBarInactive} />
+              <View style={styles.iconWrapper}>
+                <Download size={20} color={focused ? colors.brandRed : colors.tabBarInactive} />
+                {hasActiveJob && <View style={styles.downloadActiveBadge} />}
+              </View>
               <Text
                 style={[
                   styles.tabLabel,
@@ -88,27 +104,13 @@ export function MainTabs() {
         }}
       />
 
+      {/* Hidden legacy HistoryTab redirecting directly to unified DownloadsScreen */}
       <Tab.Screen
         name="HistoryTab"
-        component={HistoryScreen}
+        component={DownloadsScreen}
         options={{
-          tabBarIcon: ({ focused }) => (
-            <View style={styles.tabItem}>
-              <History size={20} color={focused ? colors.brandRed : colors.tabBarInactive} />
-              <Text
-                style={[
-                  styles.tabLabel,
-                  {
-                    color: focused ? colors.brandRed : colors.tabBarInactive,
-                    fontWeight: focused ? '700' : '500',
-                  },
-                ]}
-              >
-                History
-              </Text>
-              {focused && <View style={[styles.activeIndicator, { backgroundColor: colors.brandRed }]} />}
-            </View>
-          ),
+          tabBarButton: () => null,
+          tabBarItemStyle: { display: 'none' },
         }}
       />
 
@@ -146,6 +148,20 @@ const styles = StyleSheet.create({
     height: 48,
     position: 'relative',
     width: 68,
+  },
+  iconWrapper: {
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  downloadActiveBadge: {
+    position: 'absolute',
+    top: -2,
+    right: -6,
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: '#FF1E1E',
   },
   tabLabel: {
     fontSize: 10,

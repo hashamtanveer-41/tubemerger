@@ -10,3 +10,4 @@ export { DiagnosticsModal } from './DiagnosticsModal';
 export { CircularProgress } from './CircularProgress';
 export { NotificationModal } from './NotificationModal';
 export { VideoThumbnail } from './VideoThumbnail';
+export { UpdatePromptModal } from './updates/UpdatePromptModal';
