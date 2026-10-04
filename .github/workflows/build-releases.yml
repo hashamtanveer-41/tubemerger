@@ -173,14 +173,16 @@ jobs:
         working-directory: mobile
         run: npm ci
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Configure Android SDK & Licenses
+        run: |
+          echo "ANDROID_HOME: $ANDROID_HOME"
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
 
       - name: Build Android Release APK
         working-directory: mobile/android
         run: |
           chmod +x gradlew
-          ./gradlew assembleRelease
+          ./gradlew assembleRelease --no-daemon
 
       - name: Prepare APK Asset
         run: |

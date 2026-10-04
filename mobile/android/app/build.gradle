@@ -103,10 +103,17 @@ android {
             keyPassword 'android'
         }
         release {
-            storeFile file('release.keystore')
-            storePassword 'tubemerger123'
-            keyAlias 'tubemerger'
-            keyPassword 'tubemerger123'
+            if (file('release.keystore').exists()) {
+                storeFile file('release.keystore')
+                storePassword 'tubemerger123'
+                keyAlias 'tubemerger'
+                keyPassword 'tubemerger123'
+            } else {
+                storeFile file('debug.keystore')
+                storePassword 'android'
+                keyAlias 'androiddebugkey'
+                keyPassword 'android'
+            }
             v1SigningEnabled true
             v2SigningEnabled true
         }
