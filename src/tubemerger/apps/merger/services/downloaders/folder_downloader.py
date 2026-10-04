@@ -5,7 +5,7 @@ import random
 import time
 import uuid
 from pathlib import Path
-from typing import Callable, List, Optional
+from typing import Any, Callable, List, Optional
 
 from tubemerger.apps.history.services import HistoryService
 from tubemerger.apps.merger.services.format_builder import build_download_command
@@ -15,6 +15,27 @@ from tubemerger.apps.telemetry.service import categorize_ytdlp_error, is_resolva
 from tubemerger.utils.file_system import safe_remove_directory
 
 logger = logging.getLogger(__name__)
+
+
+def format_download_speed(speed_val: Any, fallback: str = "0.0 B/s") -> str:
+    """Safely extract and format download speed with a safe fallback to prevent crashes on initial chunk read."""
+    if speed_val is None:
+        return fallback
+    if isinstance(speed_val, dict):
+        speed_val = speed_val.get("speed") or 0.0
+    if isinstance(speed_val, (int, float)):
+        val = float(speed_val)
+        if val <= 0:
+            return fallback
+        elif val < 1024:
+            return f"{val:.1f}B/s"
+        elif val < 1024 * 1024:
+            return f"{val / 1024:.1f}KB/s"
+        elif val < 1024 * 1024 * 1024:
+            return f"{val / (1024 * 1024):.1f}MB/s"
+        return f"{val / (1024 * 1024 * 1024):.1f}GB/s"
+    s = str(speed_val).strip()
+    return s if s and s.lower() not in ("none", "unknown", "n/a", "") else fallback
 
 
 class FolderDownloader:
@@ -68,7 +89,7 @@ class FolderDownloader:
         circuit_breaker_limit = 3
         archive_file = target_folder / ".tubemerge_archive.txt"
         start_time = time.time()
-        last_speed = [None]
+        last_speed = ["0.0 B/s"]
         last_eta = [None]
 
         for idx, clip in enumerate(selected_entries, start=1):
@@ -76,6 +97,13 @@ class FolderDownloader:
             if self._is_cancelled():
                 self._emit(ProgressSnapshot(status=PipelineStatus.CANCELLED, message="Cancelled."))
                 return
+
+            # Progressive 1.5s - 3.0s jitter delay between successive clip extractions on playlists > 30 videos
+            if total_videos > 30 and idx > 1:
+                progression = (idx - 1) / total_videos
+                base_delay = 1.5 + (progression * 1.0)
+                jitter_delay = base_delay + random.uniform(0.0, 0.5)
+                time.sleep(min(3.0, max(1.5, jitter_delay)))
 
             clean_clip_title = "".join(
                 c for c in clip.title if c.isalnum() or c in " _-"
@@ -135,8 +163,28 @@ class FolderDownloader:
 
             clip_highest_pct = [0.0]
 
-            def _folder_progress(clip_pct: float, spd: str, eta: Optional[str] = None):
-                clip_highest_pct[0] = max(clip_highest_pct[0], clip_pct)
+            def _folder_progress(clip_pct: Any, spd: Any = None, eta: Optional[str] = None):
+                # Ensure the variable tracking download speed has a safe fallback default before formatting
+                if isinstance(clip_pct, dict):
+                    d = clip_pct
+                    speed = d.get("speed") or 0.0
+                    spd = format_download_speed(speed, fallback=last_speed[0] or "0.0 B/s")
+                    downloaded = d.get("downloaded_bytes") or 0
+                    total = d.get("total_bytes") or d.get("total_bytes_estimate") or 1
+                    raw_pct = (downloaded / total) * 100.0 if total > 0 else 0.0
+                    clip_highest_pct[0] = max(clip_highest_pct[0], float(raw_pct))
+                    eta = format_seconds_remaining(d.get("eta")) if d.get("eta") is not None else None
+                else:
+                    if isinstance(spd, dict):
+                        speed = spd.get("speed") or 0.0
+                        spd = format_download_speed(speed, fallback=last_speed[0] or "0.0 B/s")
+                    elif spd is not None and not isinstance(spd, str):
+                        spd = format_download_speed(spd, fallback=last_speed[0] or "0.0 B/s")
+                    else:
+                        spd = format_download_speed(spd, fallback=last_speed[0] or "0.0 B/s") if spd else (last_speed[0] or "0.0 B/s")
+
+                    clip_highest_pct[0] = max(clip_highest_pct[0], float(clip_pct or 0.0))
+
                 effective_clip_pct = clip_highest_pct[0]
                 overall = ((idx - 1 + (effective_clip_pct / 100.0)) / total_videos) * 98.0
 
@@ -150,8 +198,11 @@ class FolderDownloader:
                     playlist_eta = format_seconds_remaining(remaining_sec)
 
                 display_eta = playlist_eta or eta
-                if spd:
+                if spd and spd != "0.0 B/s":
                     last_speed[0] = spd
+                elif not last_speed[0]:
+                    last_speed[0] = spd or "0.0 B/s"
+
                 if display_eta:
                     last_eta[0] = display_eta
 
@@ -165,7 +216,7 @@ class FolderDownloader:
                     eta=display_eta or last_eta[0],
                     message=(
                         f"Downloading ({idx}/{total_videos}): {clip.title} • {spd}"
-                        if spd
+                        if spd and spd != "0.0 B/s"
                         else f"Downloading ({idx}/{total_videos}): {clip.title}"
                     ),
                 ))
@@ -276,6 +327,14 @@ class FolderDownloader:
             msg = f"Downloaded {len(downloaded_files)} of {total_videos} files to folder (remaining clips were rate-limited or skipped)."
         else:
             msg = f"Downloaded {len(downloaded_files)} files to: {target_folder}"
+
+        self._emit(ProgressSnapshot(
+            status=PipelineStatus.DOWNLOADING,
+            overall_percent=100.0,
+            message="Muxing video containers and writing chapter metadata...",
+            sub_status="Muxing video containers and writing chapter metadata...",
+            output_file=str(target_folder),
+        ))
 
         self._emit(ProgressSnapshot(
             status=PipelineStatus.DONE,

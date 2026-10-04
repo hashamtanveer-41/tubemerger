@@ -67,7 +67,8 @@ class MergeEngine(
                     totalItems = totalClips,
                     currentVideoTitle = "Initializing...",
                     overallPercent = 0.0,
-                    message = "Starting downloads..."
+                    message = "Resolving stream formats and checking metadata...",
+                    subStatus = "Resolving stream formats and checking metadata..."
                 )
             )
 
@@ -152,6 +153,18 @@ class MergeEngine(
             if (!stitchSuccess || !finalOutput.exists() || finalOutput.length() == 0L) {
                 return Result.failure(RuntimeException("Stitching failed or output file is empty."))
             }
+
+            emitMonotonic(
+                NativeProgressSnapshot(
+                    status = PipelineState.Stitching.label,
+                    currentItem = totalClips,
+                    totalItems = totalClips,
+                    currentVideoTitle = targetFilename,
+                    overallPercent = 100.0,
+                    message = "Muxing video containers and writing chapter metadata...",
+                    subStatus = "Muxing video containers and writing chapter metadata..."
+                )
+            )
 
             emitMonotonic(
                 NativeProgressSnapshot(

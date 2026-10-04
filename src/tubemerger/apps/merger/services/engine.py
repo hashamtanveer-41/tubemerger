@@ -201,6 +201,11 @@ class MergeEngine:
             snapshot.overall_percent = 100.0
             self._highest_percent = 100.0
 
+        if snapshot.overall_percent <= 0.0 and not snapshot.sub_status:
+            snapshot.sub_status = "Resolving stream formats and checking metadata..."
+        elif snapshot.overall_percent >= 100.0 and snapshot.status != PipelineStatus.DONE and not snapshot.sub_status:
+            snapshot.sub_status = "Muxing video containers and writing chapter metadata..."
+
         self._last_snapshot = snapshot
         if snapshot.status == PipelineStatus.DONE:
             try:
@@ -334,6 +339,14 @@ class MergeEngine:
         final_output_path = output_dir / sanitized_name
 
         try:
+            # 0. Initial state at 0% to prevent "loading bar stuck / frozen" complaints
+            self._emit(ProgressSnapshot(
+                status=PipelineStatus.FETCHING,
+                overall_percent=0.0,
+                message="Resolving stream formats and checking metadata...",
+                sub_status="Resolving stream formats and checking metadata...",
+            ))
+
             # 1. Fetch metadata
             self._emit(ProgressSnapshot(
                 status=PipelineStatus.FETCHING,

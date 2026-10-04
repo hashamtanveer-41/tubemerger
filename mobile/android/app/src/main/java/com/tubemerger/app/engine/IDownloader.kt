@@ -18,6 +18,7 @@ data class NativeProgressSnapshot(
     val speed: String? = null,
     val eta: String? = null,
     val message: String = "",
+    val subStatus: String? = null,
     val outputFile: String? = null,
     val error: String? = null
 )

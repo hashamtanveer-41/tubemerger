@@ -1,5 +1,6 @@
 """Unit and integration tests for TubeMerger Django-style modular backend services."""
 
+import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch, MagicMock
@@ -282,9 +283,12 @@ class TestFeedbackService(unittest.TestCase):
 
 
     def test_stream_progress_preserves_speed_and_eta(self):
+        try:
+            from tubemerger.apps.merger.controllers.merge_controller import MergeController
+        except ImportError:
+            self.skipTest("fastapi not installed in current environment")
         import asyncio
         import json
-        from tubemerger.apps.merger.controllers.merge_controller import MergeController
         from tubemerger.apps.merger.models import ProgressSnapshot, PipelineStatus
 
         ctrl = MergeController()
@@ -384,6 +388,193 @@ class TestFolderDownloaderAndErrorHandling(unittest.TestCase):
 
         res3 = categorize_ytdlp_error("Download failed for Song (rate_limited_429): HTTP Error 429: Too Many Requests")
         self.assertEqual(res3, "rate_limited_429")
+
+
+    def test_folder_downloader_speed_safe_fallback_initial_chunk(self):
+        """Verify FolderDownloader handles initial chunk reads with None/dict speed without UnboundLocalError or NameError."""
+        from tubemerger.apps.playlists.models import Playlist, VideoClip
+        from tubemerger.apps.merger.services.downloaders.folder_downloader import FolderDownloader
+        from tubemerger.apps.merger.services.specs import ProgressSnapshot, PipelineStatus
+
+        clips = [
+            VideoClip(id="c1", title="Initial Chunk Clip", url="https://youtube.com/watch?v=c1", duration_seconds=10),
+        ]
+        pl = Playlist(playlist_id="p1", title="Test Playlist", channel="Creator", webpage_url="https://youtube.com/playlist?list=p1", entries=clips)
+
+        snapshots = []
+        with tempfile.TemporaryDirectory() as td:
+            d_dir = Path(td) / "downloads"
+            t_dir = Path(td) / "temp"
+            d_dir.mkdir()
+            t_dir.mkdir()
+
+            def mock_run_download_dict(cmd, on_progress_update=None, on_status_update=None):
+                if on_progress_update:
+                    # Initial chunk read: speed is None in dict
+                    on_progress_update({"speed": None, "downloaded_bytes": 0, "total_bytes": 1000})
+                    # Second chunk: speed is 0.0
+                    on_progress_update({"speed": 0.0, "downloaded_bytes": 100, "total_bytes": 1000})
+                    # Third chunk: speed is a raw number (1MB/s)
+                    on_progress_update({"speed": 1048576, "downloaded_bytes": 500, "total_bytes": 1000})
+                    # Standard float pct with None speed
+                    on_progress_update(75.0, None)
+
+                for sub in d_dir.iterdir():
+                    if sub.is_dir():
+                        (sub / "01 - Initial Chunk Clip.mp4").write_bytes(b"video_bytes")
+                return 0, ""
+
+            fd = FolderDownloader(
+                ytdlp_path="yt-dlp",
+                ffmpeg_path="ffmpeg",
+                run_download_fn=mock_run_download_dict,
+                emit_fn=lambda snap: snapshots.append(snap),
+                check_pause_fn=lambda: None,
+                check_cancelled_fn=lambda: False,
+            )
+
+            # Must run cleanly without UnboundLocalError or NameError
+            fd.download(
+                selected_entries=clips,
+                playlist=pl,
+                job_id="test_speed_fallback",
+                is_audio=False,
+                quality="1080p",
+                audio_bitrate=None,
+                downloads_dir=d_dir,
+                temp_dir=t_dir,
+            )
+
+            self.assertTrue(len(snapshots) > 0)
+            speeds = [s.speed for s in snapshots if s.status == PipelineStatus.DOWNLOADING]
+            # Verify speeds are safe strings and never None or causing crashes
+            self.assertTrue(all(isinstance(s, str) for s in speeds if s is not None))
+            # 1048576 should be formatted as 1.0MB/s
+            self.assertIn("1.0MB/s", speeds)
+
+    def test_sub_status_payload_at_0_and_100_percent(self):
+        """Verify sub_status states at 0% and 100% in progress payloads and controller SSE stream."""
+        from tubemerger.apps.merger.models import ProgressSnapshot, PipelineStatus
+        from tubemerger.apps.merger.services.engine import MergeEngine, MergeJobSpec
+
+        # 1. Engine _emit default assignments
+        engine = MergeEngine(
+            job_spec=MergeJobSpec(playlist_url="https://youtube.com/playlist?list=1", selected_indices=[0]),
+            ytdlp_path="yt-dlp",
+            ffmpeg_path="ffmpeg",
+            metadata_service=MagicMock(),
+        )
+
+        snap_0 = ProgressSnapshot(status=PipelineStatus.FETCHING, overall_percent=0.0)
+        engine._emit(snap_0)
+        self.assertEqual(snap_0.sub_status, "Resolving stream formats and checking metadata...")
+
+        snap_100 = ProgressSnapshot(status=PipelineStatus.DOWNLOADING, overall_percent=100.0)
+        engine._emit(snap_100)
+        self.assertEqual(snap_100.sub_status, "Muxing video containers and writing chapter metadata...")
+
+    def test_bot_detection_jitter_delay_on_large_playlists(self):
+        """Verify progressive 1.5s - 3.0s jitter delay applies to playlists with > 30 videos."""
+        from tubemerger.apps.playlists.models import Playlist, VideoClip
+        from tubemerger.apps.merger.services.downloaders.folder_downloader import FolderDownloader
+
+        clips_large = [
+            VideoClip(id=f"c{i}", title=f"Clip {i}", url=f"https://youtube.com/watch?v=c{i}", duration_seconds=5)
+            for i in range(1, 33)
+        ]
+        pl_large = Playlist(playlist_id="p_large", title="Large Playlist", channel="Creator", webpage_url="https://youtube.com/playlist?list=plarge", entries=clips_large)
+
+        sleep_calls = []
+
+        def mock_sleep(seconds):
+            sleep_calls.append(seconds)
+
+        with tempfile.TemporaryDirectory() as td:
+            d_dir = Path(td) / "downloads"
+            t_dir = Path(td) / "temp"
+            d_dir.mkdir()
+            t_dir.mkdir()
+
+            def mock_run_download(cmd, on_progress_update=None, on_status_update=None):
+                for sub in d_dir.iterdir():
+                    if sub.is_dir():
+                        for idx, clip in enumerate(clips_large, 1):
+                            (sub / f"{idx:02d} - {clip.title}.mp4").write_bytes(b"dummy")
+                return 0, ""
+
+            fd = FolderDownloader(
+                ytdlp_path="yt-dlp",
+                ffmpeg_path="ffmpeg",
+                run_download_fn=mock_run_download,
+                emit_fn=lambda s: None,
+                check_pause_fn=lambda: None,
+                check_cancelled_fn=lambda: False,
+            )
+
+            with patch("time.sleep", side_effect=mock_sleep):
+                fd.download(
+                    selected_entries=clips_large,
+                    playlist=pl_large,
+                    job_id="test_jitter",
+                    is_audio=False,
+                    quality="1080p",
+                    audio_bitrate=None,
+                    downloads_dir=d_dir,
+                    temp_dir=t_dir,
+                )
+
+            # 32 clips total (> 30). For idx > 1 (i.e. clips 2 to 32 = 31 successive extractions):
+            # sleep must have been called with jitter delay between 1.5s and 3.0s
+            jitter_sleeps = [s for s in sleep_calls if 1.5 <= s <= 3.0]
+            self.assertEqual(len(jitter_sleeps), 31)
+            for delay in jitter_sleeps:
+                self.assertGreaterEqual(delay, 1.5)
+                self.assertLessEqual(delay, 3.0)
+
+        # For playlists with <= 30 videos, no jitter delay should be injected
+        clips_small = [
+            VideoClip(id=f"c{i}", title=f"Clip {i}", url=f"https://youtube.com/watch?v=c{i}", duration_seconds=5)
+            for i in range(1, 10)
+        ]
+        pl_small = Playlist(playlist_id="p_small", title="Small Playlist", channel="Creator", webpage_url="https://youtube.com/playlist?list=psmall", entries=clips_small)
+
+        small_sleep_calls = []
+        with tempfile.TemporaryDirectory() as td:
+            d_dir = Path(td) / "downloads"
+            t_dir = Path(td) / "temp"
+            d_dir.mkdir()
+            t_dir.mkdir()
+
+            def mock_run_small(cmd, on_progress_update=None, on_status_update=None):
+                for sub in d_dir.iterdir():
+                    if sub.is_dir():
+                        for idx, clip in enumerate(clips_small, 1):
+                            (sub / f"{idx:02d} - {clip.title}.mp4").write_bytes(b"dummy")
+                return 0, ""
+
+            fd_small = FolderDownloader(
+                ytdlp_path="yt-dlp",
+                ffmpeg_path="ffmpeg",
+                run_download_fn=mock_run_small,
+                emit_fn=lambda s: None,
+                check_pause_fn=lambda: None,
+                check_cancelled_fn=lambda: False,
+            )
+
+            with patch("time.sleep", side_effect=lambda s: small_sleep_calls.append(s)):
+                fd_small.download(
+                    selected_entries=clips_small,
+                    playlist=pl_small,
+                    job_id="test_small",
+                    is_audio=False,
+                    quality="1080p",
+                    audio_bitrate=None,
+                    downloads_dir=d_dir,
+                    temp_dir=t_dir,
+                )
+
+            small_jitter_sleeps = [s for s in small_sleep_calls if 1.5 <= s <= 3.0]
+            self.assertEqual(len(small_jitter_sleeps), 0)
 
 
 if __name__ == "__main__":

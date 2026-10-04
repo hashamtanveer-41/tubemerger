@@ -163,14 +163,22 @@ class MergeController:
                         effective_speed = snap_speed or (last_known_speed if is_active_download else None)
                         effective_eta = snap_eta or (last_known_eta if is_active_download else None)
 
+                        sub_status = getattr(snapshot, "sub_status", None)
+                        pct = round(snapshot.overall_percent, 1)
+                        if pct <= 0.0 and not sub_status:
+                            sub_status = "Resolving stream formats and checking metadata..."
+                        elif pct >= 100.0 and snapshot.status != PipelineStatus.DONE and not sub_status:
+                            sub_status = "Muxing video containers and writing chapter metadata..."
+
                         data = {
                             "status": snapshot.status.value
                                 if hasattr(snapshot.status, "value") else snapshot.status,
                             "current_item": snapshot.current_item,
                             "total_items": snapshot.total_items,
                             "current_video_title": snapshot.current_video_title,
-                            "overall_percent": round(snapshot.overall_percent, 1),
+                            "overall_percent": pct,
                             "message": snapshot.message,
+                            "sub_status": sub_status,
                             "speed": effective_speed,
                             "eta": effective_eta,
                             "output_file": snapshot.output_file,

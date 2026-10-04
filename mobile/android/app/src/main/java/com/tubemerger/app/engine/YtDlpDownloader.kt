@@ -51,6 +51,19 @@ class YtDlpDownloader : IDownloader {
         for ((index, clip) in clips.withIndex()) {
             if (isCancelled.get()) break
 
+            // Progressive 1.5s - 3.0s jitter delay between successive clip extractions on playlists > 30 clips
+            if (totalClips > 30 && index > 0) {
+                val progression = index.toDouble() / totalClips
+                val baseDelay = 1500L + (progression * 1000L).toLong()
+                val jitter = (Math.random() * 500).toLong()
+                val delayMs = Math.min(3000L, Math.max(1500L, baseDelay + jitter))
+                try {
+                    Thread.sleep(delayMs)
+                } catch (e: InterruptedException) {
+                    break
+                }
+            }
+
             val processId = "dl_${clip.id}_${System.currentTimeMillis()}"
             activeProcessId = processId
 

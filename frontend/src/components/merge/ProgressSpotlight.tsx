@@ -228,14 +228,18 @@ export function ProgressSpotlight({
 
           <div className="min-w-0 space-y-1">
             <span className="text-xs text-content-muted font-medium">
-              {progress.status === 'stitching'
+              {progress.sub_status
+                ? progress.sub_status
+                : progress.status === 'stitching'
                 ? 'Merging All Segments'
                 : progress.status === 'embedding_chapters'
                 ? 'Finalizing Metadata'
                 : `Clip ${progress.current_item || 1} of ${progress.total_items || selectedClips.length}`}
             </span>
             <p className="text-sm font-medium text-content-primary truncate max-w-lg">
-              {progress.status === 'stitching'
+              {progress.sub_status
+                ? progress.sub_status
+                : progress.status === 'stitching'
                 ? 'Stitching all segments into final video…'
                 : progress.status === 'embedding_chapters'
                 ? 'Embedding chapters into merged video…'

@@ -48,6 +48,7 @@ class ProgressSnapshot:
     total_items: int = 0
     current_video_title: str = ""
     message: str = ""
+    sub_status: Optional[str] = None
     speed: Optional[str] = None
     eta: Optional[str] = None
     output_file: Optional[str] = None
