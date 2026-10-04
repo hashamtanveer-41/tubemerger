@@ -91,12 +91,9 @@ export class ScreenTimeTracker {
 
   flushToAptabase(): void {
     this.commitElapsed();
-    for (const [screen, duration] of Object.entries(this.durations)) {
-      if (duration >= 1) {
-        telemetryService.trackScreenTime(screen, duration);
-      }
-    }
+    const toSend = { ...this.durations };
     this.durations = {};
+    telemetryService.trackSessionScreenTime(toSend, 'android');
   }
 
   resetForTesting(initialScreen = 'Splash'): void {

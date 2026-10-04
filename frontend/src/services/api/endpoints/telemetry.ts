@@ -4,6 +4,28 @@
 
 import { HttpClient } from '../client';
 
+export function formatDurationHuman(totalSeconds: number): string {
+  const rounded = Math.max(0, Math.round(totalSeconds));
+  if (rounded === 0) return '0 secs';
+
+  const hours = Math.floor(rounded / 3600);
+  const minutes = Math.floor((rounded % 3600) / 60);
+  const seconds = rounded % 60;
+
+  const parts: string[] = [];
+  if (hours > 0) {
+    parts.push(`${hours} hr${hours > 1 ? 's' : ''}`);
+  }
+  if (minutes > 0) {
+    parts.push(`${minutes} min`);
+  }
+  if (seconds > 0 || parts.length === 0) {
+    parts.push(`${seconds} sec${seconds === 1 ? '' : 's'}`);
+  }
+
+  return parts.join(' ');
+}
+
 export class TelemetryEndpoints {
   constructor(private http: HttpClient) {}
 
@@ -29,12 +51,33 @@ export class TelemetryEndpoints {
     });
   }
 
-  flushScreenTimes(screenTimes: Record<string, number>): void {
-    for (const [screenName, duration] of Object.entries(screenTimes)) {
-      if (duration >= 1) {
-        this.trackScreenTime(screenName, duration);
-      }
+  trackSessionScreenTime(screenTimes: Record<string, number>, platform = 'desktop'): void {
+    const validEntries = Object.entries(screenTimes).filter(([_, sec]) => sec >= 1);
+    if (validEntries.length === 0) return;
+
+    let totalSeconds = 0;
+    const props: Record<string, any> = { platform };
+    const visitedNames: string[] = [];
+
+    for (const [screen, duration] of validEntries) {
+      const rounded = Math.round(duration);
+      totalSeconds += rounded;
+      const cleanKey = screen.toLowerCase().replace(/[^a-z0-9]+/g, '_');
+      props[`${cleanKey}_time`] = formatDurationHuman(rounded);
+      props[`${cleanKey}_seconds`] = rounded;
+      visitedNames.push(screen);
     }
+
+    props.session_duration = formatDurationHuman(totalSeconds);
+    props.session_duration_seconds = totalSeconds;
+    props.screens_visited = visitedNames.join(', ');
+    props.screens_count = visitedNames.length;
+
+    this.sendBeaconEvent('session_screen_time', props);
+  }
+
+  flushScreenTimes(screenTimes: Record<string, number>): void {
+    this.trackSessionScreenTime(screenTimes, 'desktop');
   }
 
   sendBeaconEvent(eventName: string, props?: Record<string, any>): void {

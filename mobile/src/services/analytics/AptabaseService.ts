@@ -8,6 +8,7 @@ import { init, trackEvent } from '@aptabase/react-native';
 import { ITelemetryService, TelemetryProps } from './ITelemetryService';
 import { bucketClips, bucketDuration, bucketSize } from './bucketing';
 import { categorizeError, isResolvable } from './classifier';
+import { formatDurationHuman } from './formatDuration';
 
 export const DEFAULT_TELEMETRY_APP_KEY = 'A-EU-1063594697';
 
@@ -136,6 +137,31 @@ export class AptabaseService implements ITelemetryService {
       duration_seconds: Math.round(durationSeconds),
       platform: 'android',
     });
+  }
+
+  trackSessionScreenTime(screenTimes: Record<string, number>, platform = 'android'): void {
+    const validEntries = Object.entries(screenTimes).filter(([_, sec]) => sec >= 1);
+    if (validEntries.length === 0) return;
+
+    let totalSeconds = 0;
+    const props: TelemetryProps = { platform };
+    const visitedNames: string[] = [];
+
+    for (const [screen, duration] of validEntries) {
+      const rounded = Math.round(duration);
+      totalSeconds += rounded;
+      const cleanKey = screen.toLowerCase().replace(/[^a-z0-9]+/g, '_');
+      props[`${cleanKey}_time`] = formatDurationHuman(rounded);
+      props[`${cleanKey}_seconds`] = rounded;
+      visitedNames.push(screen);
+    }
+
+    props.session_duration = formatDurationHuman(totalSeconds);
+    props.session_duration_seconds = totalSeconds;
+    props.screens_visited = visitedNames.join(', ');
+    props.screens_count = visitedNames.length;
+
+    this.track('session_screen_time', props);
   }
 
   trackCustomEvent(eventName: string, props?: TelemetryProps): void {

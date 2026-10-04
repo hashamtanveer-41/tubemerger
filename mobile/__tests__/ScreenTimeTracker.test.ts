@@ -53,10 +53,14 @@ describe('ScreenTimeTracker & Aptabase Screen Duration Reporting', () => {
     // User minimizes the app (or puts in background)
     screenTimeTracker.handleAppStateChange('background');
 
-    // When minimized/closed, time should be sent to Aptabase
-    expect(aptabaseTrackEvent).toHaveBeenCalledWith('screen_time', {
-      screen_name: 'Playlist',
-      duration_seconds: 10,
+    // When minimized/closed, a single consolidated session event should be sent to Aptabase
+    expect(aptabaseTrackEvent).toHaveBeenCalledWith('session_screen_time', {
+      session_duration: '10 secs',
+      session_duration_seconds: 10,
+      playlist_time: '10 secs',
+      playlist_seconds: 10,
+      screens_visited: 'Playlist',
+      screens_count: 1,
       platform: 'android',
     });
 
@@ -73,9 +77,38 @@ describe('ScreenTimeTracker & Aptabase Screen Duration Reporting', () => {
     screenTimeTracker.handleAppStateChange('background');
 
     // Only the 5 active seconds should be recorded (the 300s in background must NOT be calculated!)
-    expect(aptabaseTrackEvent).toHaveBeenCalledWith('screen_time', {
-      screen_name: 'Playlist',
-      duration_seconds: 5,
+    expect(aptabaseTrackEvent).toHaveBeenCalledWith('session_screen_time', {
+      session_duration: '5 secs',
+      session_duration_seconds: 5,
+      playlist_time: '5 secs',
+      playlist_seconds: 5,
+      screens_visited: 'Playlist',
+      screens_count: 1,
+      platform: 'android',
+    });
+  });
+
+  it('formats complex multi-screen session times into human readable strings (hr min secs)', () => {
+    // 1 hr 34 min 34 secs on Downloads (5674 seconds)
+    screenTimeTracker.setCurrentScreen('Downloads');
+    currentTime += 5674000;
+
+    // 1 min 45 secs on Home (105 seconds)
+    screenTimeTracker.setCurrentScreen('Home');
+    currentTime += 105000;
+
+    // App backgrounded
+    screenTimeTracker.handleAppStateChange('background');
+
+    expect(aptabaseTrackEvent).toHaveBeenCalledWith('session_screen_time', {
+      session_duration: '1 hr 36 min 19 secs',
+      session_duration_seconds: 5779,
+      downloads_time: '1 hr 34 min 34 secs',
+      downloads_seconds: 5674,
+      home_time: '1 min 45 secs',
+      home_seconds: 105,
+      screens_visited: 'Downloads, Home',
+      screens_count: 2,
       platform: 'android',
     });
   });
