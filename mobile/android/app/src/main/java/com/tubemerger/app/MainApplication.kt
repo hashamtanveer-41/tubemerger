@@ -20,6 +20,14 @@ class MainApplication : Application(), ReactApplication {
   }
 
   override fun onCreate() {
+    val prefs = getSharedPreferences("tubemerger_settings", android.content.Context.MODE_PRIVATE)
+    val savedTheme = prefs.getString("theme", null)
+    when (savedTheme) {
+      "dark" -> androidx.appcompat.app.AppCompatDelegate.setDefaultNightMode(androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_YES)
+      "light" -> androidx.appcompat.app.AppCompatDelegate.setDefaultNightMode(androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_NO)
+      else -> androidx.appcompat.app.AppCompatDelegate.setDefaultNightMode(androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM)
+    }
+
     super.onCreate()
     loadReactNative(this)
 

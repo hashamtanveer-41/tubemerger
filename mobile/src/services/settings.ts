@@ -1,7 +1,10 @@
 /**
  * TubeMerger Mobile - Settings Service
  * Manages user preferences for theme (light/dark), video quality, framerate, audio bitrate, and toggles.
+ * Features persistent native SharedPreferences storage and automatic system theme detection on fresh launch.
  */
+
+import { NativeModules, Platform, Appearance } from 'react-native';
 
 export interface AppSettings {
   theme: 'light' | 'dark';
@@ -23,8 +26,58 @@ const DEFAULT_SETTINGS: AppSettings = {
   showNotifications: true,
 };
 
-let currentSettings: AppSettings = { ...DEFAULT_SETTINGS };
+const { TubeMergerModule } = NativeModules;
+
+let hasUserSelectedTheme = false;
+
+function initSettings(): AppSettings {
+  const systemTheme: 'light' | 'dark' = Appearance?.getColorScheme() === 'dark' ? 'dark' : 'light';
+  let initialTheme: 'light' | 'dark' = systemTheme;
+  let parsedSettings: Partial<AppSettings> = {};
+
+  if (TubeMergerModule) {
+    try {
+      const constants = TubeMergerModule.getConstants ? TubeMergerModule.getConstants() : {};
+      const savedTheme = constants?.savedTheme;
+      const savedSettingsRaw = constants?.savedSettings;
+
+      if (savedTheme === 'light' || savedTheme === 'dark') {
+        initialTheme = savedTheme;
+        hasUserSelectedTheme = true;
+      }
+
+      if (savedSettingsRaw && savedSettingsRaw !== '{}') {
+        parsedSettings = JSON.parse(savedSettingsRaw);
+        if (parsedSettings.theme === 'light' || parsedSettings.theme === 'dark') {
+          initialTheme = parsedSettings.theme;
+          hasUserSelectedTheme = true;
+        }
+      }
+    } catch {
+      // Fallback to systemTheme
+    }
+  }
+
+  return {
+    ...DEFAULT_SETTINGS,
+    ...parsedSettings,
+    theme: initialTheme,
+  };
+}
+
+let currentSettings: AppSettings = initSettings();
 const listeners: Set<() => void> = new Set();
+
+// Listen to system theme changes if user hasn't explicitly set a theme yet
+Appearance?.addChangeListener?.(({ colorScheme }) => {
+  if (!hasUserSelectedTheme) {
+    const nextTheme: 'light' | 'dark' = colorScheme === 'dark' ? 'dark' : 'light';
+    if (currentSettings.theme !== nextTheme) {
+      currentSettings = { ...currentSettings, theme: nextTheme };
+      listeners.forEach((fn) => fn());
+    }
+  }
+});
 
 export const settingsService = {
   getSettings(): AppSettings {
@@ -32,8 +85,40 @@ export const settingsService = {
   },
 
   updateSettings(partial: Partial<AppSettings>): AppSettings {
+    if (partial.theme) {
+      hasUserSelectedTheme = true;
+    }
+
     currentSettings = { ...currentSettings, ...partial };
     listeners.forEach((fn) => fn());
+
+    // Persist asynchronously to native storage
+    if (TubeMergerModule) {
+      if (partial.theme && TubeMergerModule.saveSetting) {
+        TubeMergerModule.saveSetting('theme', partial.theme).catch(() => {});
+      }
+      if (TubeMergerModule.saveAllSettings) {
+        TubeMergerModule.saveAllSettings(JSON.stringify(currentSettings)).catch(() => {});
+      }
+    }
+
+    return { ...currentSettings };
+  },
+
+  async loadPersistedSettings(): Promise<AppSettings> {
+    if (TubeMergerModule?.getAllSettings) {
+      try {
+        const raw = await TubeMergerModule.getAllSettings();
+        if (raw && raw !== '{}') {
+          const loaded = JSON.parse(raw);
+          if (loaded.theme) {
+            hasUserSelectedTheme = true;
+          }
+          currentSettings = { ...currentSettings, ...loaded };
+          listeners.forEach((fn) => fn());
+        }
+      } catch {}
+    }
     return { ...currentSettings };
   },
 

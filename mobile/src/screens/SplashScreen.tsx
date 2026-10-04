@@ -1,8 +1,8 @@
 /**
  * TubeMerger Mobile - SplashScreen
- * Pixel-perfect match for Screenshot 1:
- * - Pure dark AMOLED background with ambient red wave
- * - Official TubeMerger logo, brand title, and open source subtitle
+ * Dynamically theme-aware (Light & Dark mode):
+ * - Light Mode: Clean white AMOLED/retina backdrop, light red ambient glow, dark brand typography, red accent, light loader track
+ * - Dark Mode: Deep AMOLED background (#08080A), red ambient wave, white brand typography, red accent, dark loader track
  * - Smooth rotating red loading ring
  * - Bottom tagline: "Your YouTube playlists, merged seamlessly."
  */
@@ -20,10 +20,12 @@ import {
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import Svg, { Circle } from 'react-native-svg';
 import { RootStackParamList } from '../navigation/types';
+import { useTheme } from '../theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Splash'>;
 
 export function SplashScreen({ navigation }: Props) {
+  const { isDark, colors } = useTheme();
   const rotateAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
@@ -59,14 +61,22 @@ export function SplashScreen({ navigation }: Props) {
   });
 
   return (
-    <View className="flex-1 bg-[#060608] justify-between items-center py-16">
-      <StatusBar barStyle="light-content" />
+    <View
+      style={{ backgroundColor: colors.bg }}
+      className="flex-1 justify-between items-center py-16"
+    >
+      <StatusBar barStyle={colors.statusBarStyle} backgroundColor={colors.bg} />
 
       {/* Ambient Red Wave in Background */}
       <View style={StyleSheet.absoluteFill} pointerEvents="none" className="items-center justify-center">
         <Image
           source={require('../assets/ambient_wave.png')}
-          style={{ width: '120%', height: '100%', opacity: 0.28, resizeMode: 'cover' }}
+          style={{
+            width: '120%',
+            height: '100%',
+            opacity: isDark ? 0.28 : 0.12,
+            resizeMode: 'cover',
+          }}
         />
       </View>
 
@@ -76,21 +86,40 @@ export function SplashScreen({ navigation }: Props) {
       {/* Center Branding Content */}
       <Animated.View style={{ opacity: fadeAnim, alignItems: 'center' }}>
         {/* Official Logo */}
-        <View className="mb-4 shadow-lg shadow-brand-red/30">
+        <View
+          style={{
+            shadowColor: '#FF1E1E',
+            shadowOffset: { width: 0, height: 6 },
+            shadowOpacity: isDark ? 0.35 : 0.18,
+            shadowRadius: 14,
+            elevation: 8,
+          }}
+          className="mb-4"
+        >
           <Image
             source={require('../assets/logo.png')}
-            style={{ width: 84, height: 84, resizeMode: 'contain' }}
+            style={{ width: 88, height: 88, resizeMode: 'contain' }}
           />
         </View>
 
         {/* Brand Title */}
         <View className="flex-row items-center mb-1">
-          <Text className="text-3xl font-extrabold text-white tracking-tight">Tube</Text>
-          <Text className="text-3xl font-extrabold text-[#FF1E1E] tracking-tight">Merger</Text>
+          <Text
+            style={{ color: colors.text }}
+            className="text-3xl font-extrabold tracking-tight"
+          >
+            Tube
+          </Text>
+          <Text className="text-3xl font-extrabold text-[#FF1E1E] tracking-tight">
+            Merger
+          </Text>
         </View>
 
         {/* Tagline / Subtitle */}
-        <Text className="text-[10px] font-bold text-[#8E8E98] tracking-[3px] uppercase mb-8">
+        <Text
+          style={{ color: colors.textMuted }}
+          className="text-[10px] font-bold tracking-[3px] uppercase mb-8"
+        >
           FREE & OPEN SOURCE
         </Text>
 
@@ -101,7 +130,7 @@ export function SplashScreen({ navigation }: Props) {
               cx={19}
               cy={19}
               r={15}
-              stroke="#2A0B0B"
+              stroke={isDark ? '#2A0B0B' : '#FEE2E2'}
               strokeWidth={3}
               fill="none"
             />
@@ -122,7 +151,10 @@ export function SplashScreen({ navigation }: Props) {
 
       {/* Bottom Tagline */}
       <Animated.View style={{ opacity: fadeAnim, alignItems: 'center' }}>
-        <Text className="text-xs text-[#8E8E98] text-center leading-5 font-medium">
+        <Text
+          style={{ color: colors.textSecondary }}
+          className="text-xs text-center leading-5 font-medium"
+        >
           Your YouTube playlists,{'\n'}merged seamlessly.
         </Text>
       </Animated.View>

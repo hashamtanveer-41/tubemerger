@@ -38,6 +38,7 @@ class TubeMergerModule(private val reactContext: ReactApplicationContext) :
             putString("current_video_title", snapshot.currentVideoTitle)
             putDouble("overall_percent", snapshot.overallPercent)
             putString("message", snapshot.message)
+            snapshot.subStatus?.let { putString("sub_status", it) }
             snapshot.speed?.let { putString("speed", it) }
             snapshot.eta?.let { putString("eta", it) }
             snapshot.outputFile?.let { putString("output_file", it) }
@@ -760,6 +761,86 @@ class TubeMergerModule(private val reactContext: ReactApplicationContext) :
             } catch (e: Exception) {
                 promise.resolve("")
             }
+        }
+    }
+
+    override fun getConstants(): MutableMap<String, Any> {
+        val prefs = reactContext.getSharedPreferences("tubemerger_settings", android.content.Context.MODE_PRIVATE)
+        val map = HashMap<String, Any>()
+        map["savedTheme"] = prefs.getString("theme", "") ?: ""
+        map["savedSettings"] = prefs.getString("settings_json", "{}") ?: "{}"
+        return map
+    }
+
+    @ReactMethod
+    fun saveSetting(key: String, value: String, promise: Promise) {
+        try {
+            val prefs = reactContext.getSharedPreferences("tubemerger_settings", android.content.Context.MODE_PRIVATE)
+            prefs.edit().putString(key, value).apply()
+
+            if (key == "theme") {
+                reactContext.runOnUiQueueThread {
+                    when (value) {
+                        "dark" -> androidx.appcompat.app.AppCompatDelegate.setDefaultNightMode(androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_YES)
+                        "light" -> androidx.appcompat.app.AppCompatDelegate.setDefaultNightMode(androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_NO)
+                        else -> androidx.appcompat.app.AppCompatDelegate.setDefaultNightMode(androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM)
+                    }
+                }
+            }
+            promise.resolve(true)
+        } catch (e: Exception) {
+            promise.reject("SAVE_SETTING_ERROR", e.message)
+        }
+    }
+
+    @ReactMethod
+    fun getSetting(key: String, defaultValue: String, promise: Promise) {
+        try {
+            val prefs = reactContext.getSharedPreferences("tubemerger_settings", android.content.Context.MODE_PRIVATE)
+            val v = prefs.getString(key, defaultValue) ?: defaultValue
+            promise.resolve(v)
+        } catch (e: Exception) {
+            promise.resolve(defaultValue)
+        }
+    }
+
+    @ReactMethod
+    fun saveAllSettings(json: String, promise: Promise) {
+        try {
+            val prefs = reactContext.getSharedPreferences("tubemerger_settings", android.content.Context.MODE_PRIVATE)
+            val editor = prefs.edit()
+            editor.putString("settings_json", json)
+
+            try {
+                val obj = JSONObject(json)
+                if (obj.has("theme")) {
+                    val themeVal = obj.getString("theme")
+                    editor.putString("theme", themeVal)
+                    reactContext.runOnUiQueueThread {
+                        when (themeVal) {
+                            "dark" -> androidx.appcompat.app.AppCompatDelegate.setDefaultNightMode(androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_YES)
+                            "light" -> androidx.appcompat.app.AppCompatDelegate.setDefaultNightMode(androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_NO)
+                            else -> androidx.appcompat.app.AppCompatDelegate.setDefaultNightMode(androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM)
+                        }
+                    }
+                }
+            } catch (_: Exception) {}
+
+            editor.apply()
+            promise.resolve(true)
+        } catch (e: Exception) {
+            promise.reject("SAVE_ALL_SETTINGS_ERROR", e.message)
+        }
+    }
+
+    @ReactMethod
+    fun getAllSettings(promise: Promise) {
+        try {
+            val prefs = reactContext.getSharedPreferences("tubemerger_settings", android.content.Context.MODE_PRIVATE)
+            val json = prefs.getString("settings_json", "{}") ?: "{}"
+            promise.resolve(json)
+        } catch (e: Exception) {
+            promise.resolve("{}")
         }
     }
 
