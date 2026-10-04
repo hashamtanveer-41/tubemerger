@@ -3,23 +3,26 @@
 <p align="center">
   <a href="https://tubemerger.com"><img src="https://img.shields.io/badge/Website-tubemerger.com-6366f1?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Official Website" /></a>
   <a href="https://tubemerger.com/download"><img src="https://img.shields.io/badge/Download-Release%20Binaries-10b981?style=for-the-badge&logo=windows&logoColor=white" alt="Download Releases" /></a>
+  <a href="https://tubemerger.com/download"><img src="https://img.shields.io/badge/Mobile-Android%20APK-3DDC84?style=for-the-badge&logo=android&logoColor=white" alt="Android APK" /></a>
   <a href="https://github.com/hashamtanveer-41/tubemerger/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge" alt="MIT License" /></a>
   <a href="https://alternativeto.net/software/tubemerger/"><img src="https://img.shields.io/badge/AlternativeTo-Listed-0080FF?style=for-the-badge&logo=alternativeto&logoColor=white" alt="AlternativeTo" /></a>
   <a href="https://youtu.be/9UKKVZPkXHk"><img src="https://img.shields.io/badge/Demo-YouTube%20Walkthrough-FF0000?style=for-the-badge&logo=youtube&logoColor=white" alt="YouTube Demo" /></a>
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/python-3.10+-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python" />
+  <img src="https://img.shields.io/badge/Platforms-Android%20%7C%20Windows%20%7C%20macOS%20%7C%20Linux-blue?style=flat-square" alt="Supported Platforms" />
   <img src="https://img.shields.io/badge/FastAPI-0.111+-009688?style=flat-square&logo=fastapi&logoColor=white" alt="FastAPI" />
-  <img src="https://img.shields.io/badge/React-19.0-61DAFB?style=flat-square&logo=react&logoColor=black" alt="React 19" />
+  <img src="https://img.shields.io/badge/React%20Native-0.87-61DAFB?style=flat-square&logo=react&logoColor=black" alt="React Native 0.87" />
   <img src="https://img.shields.io/badge/TypeScript-5.7-3178C6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript" />
-  <img src="https://img.shields.io/badge/Tailwind-4.0-38B2AC?style=flat-square&logo=tailwindcss&logoColor=white" alt="Tailwind CSS" />
-  <img src="https://img.shields.io/badge/version-1.1.0-brightgreen?style=flat-square" alt="Version 1.1.0" />
+  <img src="https://img.shields.io/badge/Ads-0%25%20(Ad--Free)-brightgreen?style=flat-square" alt="100% Ad-Free" />
+  <img src="https://img.shields.io/badge/version-1.2.0-brightgreen?style=flat-square" alt="Version 1.2.0" />
 </p>
 
-**[TubeMerger](https://tubemerger.com)** is a 100% free, open-source desktop application for Windows, macOS, and Linux that lets you **[download YouTube playlists](https://tubemerger.com/download)**, **[merge full playlists into a single seamless video](https://tubemerger.com/playlist-to-single-video)** with automatic chapter markers, **download 4K Ultra HD single videos & Shorts**, and **extract or stitch 320kbps MP3 audio albums**. Powered by `yt-dlp` and `FFmpeg` running entirely on your local machine, TubeMerger is an ad-free media workstation with no cloud queues, no account registrations, and no artificial duration caps.
+**[TubeMerger](https://tubemerger.com)** is a 100% free, open-source media workstation for **Android, Windows, macOS, and Linux** that lets you **[download YouTube playlists](https://tubemerger.com/download)**, **[merge full playlists into a single seamless video](https://tubemerger.com/playlist-to-single-video)** with automatic chapter markers, **download 4K Ultra HD videos & Shorts**, and **extract or stitch 320kbps MP3 audio albums**. 
 
-What makes TubeMerger different from bulk download tools is its granular control and rich desktop capabilities. You get an interactive playlist inspector to cherry-pick or skip clips with one click, dynamic bitrate-aware file size recalculation, native process-level pause/resume, sequential background queuing to prevent bandwidth choking, and instant diagnostics for commercial streaming links (like Spotify and Apple Music).
+As a **100% ad-free, open-source alternative to VidMate, SnapTube, and TubeMate**, TubeMerger runs `yt-dlp` and `FFmpeg` directly on your local device — zero cloud queues, zero account registrations, zero bloatware, and zero intrusive ads.
+
+What makes TubeMerger different from bulk download tools is its granular control and rich desktop & mobile capabilities. You get an interactive playlist inspector to cherry-pick or skip clips with one click, dynamic bitrate-aware file size recalculation, native process-level pause/resume, sequential background queuing to prevent bandwidth choking, and instant diagnostics for commercial streaming links (like Spotify and Apple Music).
 
 ---
 
@@ -76,6 +79,26 @@ Never download a video you don't want. The playlist inspector displays each vide
 - **Auto Binary Management** — Automatically detects or provisions portable `FFmpeg` and `yt-dlp` binaries to `~/.tubemerger/bin/` on first launch.
 - **Modern SEO & Web App Metadata** — Complete Open Graph, Twitter Cards, dynamic document titles, and JSON-LD `SoftwareApplication` structured schema.
 - **Completely Free & Open Source** — Zero paywalls, no device caps, no subscriptions, and no license keys. MIT licensed.
+
+---
+
+## 📱 TubeMerger Mobile (Android) — The Privacy-First VidMate & SnapTube Alternative
+
+TubeMerger is now available as a native **Android application**, bringing workstation-grade playlist merging, video downloading, and audio extraction directly to your phone.
+
+| Feature | TubeMerger Mobile | VidMate | SnapTube | TubeMate |
+|:---|:---:|:---:|:---:|:---:|
+| **License** | **100% Open Source (MIT)** | Closed Source | Closed Source | Closed Source |
+| **Advertisements** | **Zero (100% Ad-Free)** | Heavy / Popups | Heavy / Push ads | Banner ads |
+| **Merge Playlist to 1 Video** | **✅ Yes (with Chapters)** | ❌ No | ❌ No | ❌ No |
+| **Interactive Clip Filter** | **✅ Yes (Skip clips before download)** | ❌ No | ❌ No | ❌ No |
+| **Max Audio Quality** | **320kbps MP3 (Uncapped)** | Often 128k paywalled | Paywalled | Up to 192k |
+| **Background Downloads** | **✅ Resilient Android Foreground Service** | Unreliable / Ad-gated | Battery draining | Basic |
+| **Tracker SDKs** | **Zero (100% Private & Local)** | Multiple Ad Trackers | Multiple Ad Trackers | Trackers |
+| **Theme System** | **Light & AMOLED Dark (Auto-Detect)** | Basic | Basic | Basic |
+| **Adaptive Launcher Icon** | **Clean White Adaptive Icon** | Standard | Standard | Standard |
+
+👉 **Read the full mobile documentation & build instructions:** [mobile/README.md](file:///home/hasham-tanveer/Documents/antigravity/tubemerger/mobile/README.md)
 
 ---
 

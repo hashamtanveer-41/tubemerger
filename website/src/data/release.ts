@@ -26,7 +26,7 @@ const BASE_URL =
   'https://github.com/hashamtanveer-41/tubemerger/releases/latest/download';
 
 export const STATIC_RELEASE: ReleaseData = {
-  version: '1.1.6',
+  version: '1.2.0',
   publishedAt: null,
 
   platforms: {

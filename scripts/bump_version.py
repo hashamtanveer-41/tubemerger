@@ -166,6 +166,32 @@ def bump(new_version: str, dry_run: bool = False) -> None:
         f"\\g<1>{new_version}",
     )
 
+    # ── mobile/package.json ──────────────────────────────────────────────
+    _replace(
+        Path("mobile/package.json"),
+        r'("version"\s*:\s*)"[\d.]+"',
+        f'\\1"{new_version}"',
+    )
+
+    # ── mobile/android/app/build.gradle ──────────────────────────────────
+    full_gradle = ROOT / "mobile/android/app/build.gradle"
+    if full_gradle.exists():
+        gtext = full_gradle.read_text(encoding="utf-8")
+        gtext = re.sub(r'(versionName\s+)"[\d.]+"', f'\\1"{new_version}"', gtext, count=1)
+        vm = re.search(r'versionCode\s+(\d+)', gtext)
+        if vm:
+            code = int(vm.group(1)) + 1
+            gtext = re.sub(r'versionCode\s+\d+', f'versionCode {code}', gtext, count=1)
+        changes.append((full_gradle, gtext))
+        print("  BUMP  mobile/android/app/build.gradle")
+
+    # ── src/tubemerger/data/banner.py ────────────────────────────────────
+    _replace(
+        Path("src/tubemerger/data/banner.py"),
+        r'v\d+\.\d+\.\d+',
+        f'v{new_version}',
+    )
+
     # ── Apply ─────────────────────────────────────────────────────────────
     print()
     if dry_run:
