@@ -141,42 +141,42 @@ function figmaSiteConfiguration(config: FigmaSiteConfiguration): Plugin {
         result = replaceHtmlCommentSlot(result, "figma:body-end", bodyEnd)
 
         const tags: HtmlTagDescriptor[] = []
-        if (description) {
+        if (description && !result.includes('name="description"')) {
           tags.push({
             tag: "meta",
             attrs: { name: "description", content: description },
             injectTo: "head",
           })
         }
-        if (config.robots?.index === false) {
+        if (config.robots?.index === false && !result.includes('name="robots"')) {
           tags.push({
             tag: "meta",
             attrs: { name: "robots", content: "noindex, nofollow" },
             injectTo: "head",
           })
         }
-        if (favicon) {
+        if (favicon && !result.includes('rel="icon"')) {
           tags.push({
             tag: "link",
             attrs: { rel: "icon", href: favicon },
             injectTo: "head",
           })
         }
-        if (title) {
+        if (title && !result.includes('property="og:title"')) {
           tags.push({
             tag: "meta",
             attrs: { property: "og:title", content: title },
             injectTo: "head",
           })
         }
-        if (description) {
+        if (description && !result.includes('property="og:description"')) {
           tags.push({
             tag: "meta",
             attrs: { property: "og:description", content: description },
             injectTo: "head",
           })
         }
-        if (socialImage) {
+        if (socialImage && !result.includes('property="og:image"')) {
           tags.push(
             {
               tag: "meta",

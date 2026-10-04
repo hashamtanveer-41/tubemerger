@@ -10,8 +10,16 @@ export default function FaqSection() {
 
   const faqs: FaqItem[] = [
     {
-      q: "How do I turn an entire YouTube playlist into one video?",
-      a: "Paste your playlist URL into TubeMerger, select your preferred video resolution, uncheck any unwanted intro or outro clips, and choose Stitched mode. TubeMerger downloads the clips locally and joins them into a single MP4 with seekable chapter markers.",
+      q: "How do I combine a YouTube playlist into one video?",
+      a: "Paste your playlist URL into TubeMerger, select your preferred video resolution (up to 4K), toggle off any unwanted clips, and choose Stitched mode. TubeMerger combines the YouTube playlist into one video offline and embeds seekable chapter markers automatically.",
+    },
+    {
+      q: "What makes TubeMerger the best YouTube playlist merger?",
+      a: "Unlike online converters with duration limits or ad-heavy tools, TubeMerger is a 100% free, open-source YouTube playlist merger running directly on your hardware via native yt-dlp and FFmpeg. It auto-normalizes frame rates, audio sample rates, and resolutions without cloud queues, watermarks, or quality loss.",
+    },
+    {
+      q: "Is there a YouTube playlist downloader APK for Android?",
+      a: "Yes! The TubeMerger YouTube playlist downloader APK is available for Android 8.0+. It features native foreground background downloads, full 4K and 320kbps MP3 support, dark/light dynamic theming, and zero ads or trackers—making it a privacy-first alternative to VidMate and SnapTube.",
     },
     {
       q: "Can TubeMerger merge videos with different resolutions or aspect ratios?",
@@ -23,7 +31,7 @@ export default function FaqSection() {
     },
     {
       q: "Is TubeMerger free and open-source?",
-      a: "Yes, TubeMerger is released under the MIT open-source license with no advertisements, subscription fees, or video duration caps. Pre-compiled binaries are available for Windows, macOS, and Linux.",
+      a: "Yes, TubeMerger is released under the MIT open-source license with no advertisements, subscription fees, or video duration caps. Pre-compiled binaries are available for Windows, Linux, macOS, and Android APK.",
     },
   ]
 

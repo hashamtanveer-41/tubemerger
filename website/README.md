@@ -11,16 +11,17 @@
 
 ## 🌟 Overview
 
-This repository powers **[tubemerger.com](https://tubemerger.com)**, the primary landing page and distribution hub for the **TubeMerger Desktop Application** (available for Windows, macOS, and Linux).
+This repository powers **[tubemerger.com](https://tubemerger.com)**, the primary landing page, documentation, and distribution hub for the **TubeMerger Mobile (Android APK)** and **Desktop Workstations** (Windows, macOS, and Linux).
 
 ### Features
 - **Hero & Value Proposition**: High-impact introduction to playlist downloading and merging with animated wave canvas backdrop.
+- **Mobile & Desktop Hub**: Download links for Android APK (VidMate/SnapTube open-source alternative) and desktop binaries.
 - **Interactive Product Simulator**: Try out the real-time playlist probe, resolution switches, and merge pipeline simulation directly in the browser.
 - **Feature Showcase**: Deep dive into automated chapter markers, 100% offline local SQLite WAL processing, and fast download speeds.
-- **Competitive Matrix**: In-depth comparison comparing TubeMerger against Premiere Pro, cloud converters, and bare-metal FFmpeg CLI.
+- **Competitive Matrix**: In-depth comparison comparing TubeMerger against VidMate, SnapTube, Premiere Pro, and cloud converters.
 - **100% Free & Open Source**: MIT licensed with zero paywalls, no device restrictions, and no subscriptions.
 - **FAQ Accordion**: Common questions answered regarding offline privacy, player compatibility, and community support.
-- **Dedicated `/download` Hub**: OS auto-detection, platform release specs, SHA-256 verification hashes, and multi-platform installation guides.
+- **Dedicated `/download` Hub**: OS auto-detection (Android, Windows, macOS, Linux), platform release specs, SHA-256 verification hashes, and installation guides.
 
 ---
 

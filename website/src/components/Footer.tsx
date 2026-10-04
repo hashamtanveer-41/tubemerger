@@ -31,9 +31,11 @@ function Logo() {
 export default function Footer({
   onNavigatePlaylistGuide,
   onNavigateYTDownloader,
+  onNavigateAndroid,
 }: {
   onNavigatePlaylistGuide?: () => void
   onNavigateYTDownloader?: () => void
+  onNavigateAndroid?: () => void
 }) {
   return (
     <footer
@@ -79,6 +81,14 @@ export default function Footer({
               className="font-sans text-[14px] text-white/50 transition-colors hover:text-white cursor-pointer"
             >
               Playlist Downloader
+            </button>
+          )}
+          {onNavigateAndroid && (
+            <button
+              onClick={onNavigateAndroid}
+              className="font-sans text-[14px] text-white/50 transition-colors hover:text-[#3DDC84] cursor-pointer"
+            >
+              Android APK
             </button>
           )}
           <a

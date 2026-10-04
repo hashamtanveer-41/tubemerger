@@ -11,12 +11,15 @@ import Footer from "@/components/Footer"
 import DownloadPage from "@/pages/DownloadPage"
 import PlaylistToVideoPage from "@/pages/PlaylistToVideoPage"
 import YouTubePlaylistDownloaderPage from "@/pages/YouTubePlaylistDownloaderPage"
+import AndroidPage from "@/pages/AndroidPage"
 import { Analytics } from "@vercel/analytics/react"
 import { SpeedInsights } from "@vercel/speed-insights/react"
 
 export default function App() {
-  // Handle client-side routing between Home and dedicated Download Page
-  const [currentView, setCurrentView] = useState<"home" | "download" | "playlist-guide" | "playlist-downloader">(() => {
+  // Handle client-side routing between Home, Download, Guides, and Android APK Page
+  const [currentView, setCurrentView] = useState<
+    "home" | "download" | "playlist-guide" | "playlist-downloader" | "android"
+  >(() => {
     if (typeof window !== "undefined") {
       const path = window.location.pathname.toLowerCase()
       const hash = window.location.hash.toLowerCase()
@@ -28,6 +31,15 @@ export default function App() {
       }
       if (path === "/youtube-playlist-downloader") {
         return "playlist-downloader"
+      }
+      if (
+        path === "/android" ||
+        path === "/download-android" ||
+        hash === "#android" ||
+        hash === "#/android" ||
+        hash === "#download-android"
+      ) {
+        return "android"
       }
     }
     return "home"
@@ -44,6 +56,14 @@ export default function App() {
         setCurrentView("playlist-guide")
       } else if (path === "/youtube-playlist-downloader") {
         setCurrentView("playlist-downloader")
+      } else if (
+        path === "/android" ||
+        path === "/download-android" ||
+        hash === "#android" ||
+        hash === "#/android" ||
+        hash === "#download-android"
+      ) {
+        setCurrentView("android")
       } else {
         setCurrentView("home")
       }
@@ -66,6 +86,18 @@ export default function App() {
       }
     } catch {
       window.location.hash = "#download"
+    }
+    window.scrollTo({ top: 0, behavior: "smooth" })
+  }
+
+  const navigateToAndroid = () => {
+    setCurrentView("android")
+    try {
+      if (window.location.pathname !== "/android") {
+        window.history.pushState(null, "", "/android")
+      }
+    } catch {
+      window.location.hash = "#android"
     }
     window.scrollTo({ top: 0, behavior: "smooth" })
   }
@@ -130,9 +162,20 @@ export default function App() {
         <>
           {/* Download Page SEO */}
           <SEO
-            title="Download TubeMerger — 100% Free & Open Source Video & Playlist Downloader"
-            description="Download TubeMerger native desktop application for all operating systems. Download YouTube playlists and videos offline with fast local processing."
+            title="Download TubeMerger — Free Video & Playlist Downloader (Windows, Linux & Android APK)"
+            description="Download TubeMerger for Windows, Linux, macOS, and Android (APK). Combine YouTube playlists into a single MP4 video offline with chapter markers or batch download full queues. 100% free and open source."
             canonicalUrl="https://tubemerger.com/download"
+            keywords={[
+              "tubemerger download",
+              "youtube playlist downloader apk",
+              "youtube playlist merger download",
+              "combine youtube playlist into one video",
+              "youtube downloader apk",
+              "download youtube playlist android",
+              "tubemerger android apk",
+              "tubemerger windows",
+              "tubemerger linux",
+            ]}
           />
 
           {/* Dedicated Download Page */}
@@ -153,21 +196,46 @@ export default function App() {
           onNavigateDownload={navigateToDownload}
           onNavigatePlaylistGuide={navigateToPlaylistGuide}
         />
+      ) : currentView === "android" ? (
+        <AndroidPage
+          onNavigateHome={navigateToHome}
+          onNavigateDownload={navigateToDownload}
+        />
       ) : (
         <div className="min-h-screen bg-canvas text-white selection:bg-coral/30 selection:text-white flex flex-col">
           {/* Home Page SEO */}
           <SEO
-            title="TubeMerger — Turn Video Playlists into Seamless Masters | Free Video & Playlist Downloader"
-            description="Download YouTube playlists and videos with TubeMerger. Merge full playlists into seamless, high-quality masters with automatic chapter bookmarks and audio leveling. 100% free, open-source, and offline for all operating systems."
+            title="TubeMerger — Merge YouTube Playlists Into One Video (Windows, Linux & Android APK)"
+            description="Combine YouTube playlists into a single MP4 video offline with chapter markers, or batch download full queues. Free, open source, no duration limits. Available for Windows, Linux, and Android APK."
             canonicalUrl="https://tubemerger.com/"
+            keywords={[
+              "youtube playlist merger",
+              "combine youtube playlist into one video",
+              "youtube playlist downloader apk",
+              "youtube downloader for mobile",
+              "vidmate alternative",
+              "snaptube alternative",
+              "tubemate alternative",
+              "merge youtube playlist",
+              "youtube video downloader",
+              "playlist downloader",
+              "stitch videos offline",
+              "video chapter generator",
+            ]}
           />
 
           {/* Solid Global Header */}
-          <Navbar onOpenDownload={navigateToDownload} />
+          <Navbar
+            onOpenDownload={navigateToDownload}
+            onNavigateAndroid={navigateToAndroid}
+          />
 
           {/* Main Content Sections */}
           <main id="main-content" role="main" className="flex-1">
-            <Hero onOpenDownload={navigateToDownload} />
+            <Hero
+              onOpenDownload={navigateToDownload}
+              onNavigateAndroid={navigateToAndroid}
+            />
 
             <Showcase />
 
@@ -184,6 +252,7 @@ export default function App() {
           <Footer
             onNavigatePlaylistGuide={navigateToPlaylistGuide}
             onNavigateYTDownloader={navigateToYTDownloader}
+            onNavigateAndroid={navigateToAndroid}
           />
         </div>
       )}
