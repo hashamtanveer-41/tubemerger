@@ -19,5 +19,6 @@ export interface ITelemetryService {
   ): void;
   trackMergeCancelled(overallPercent: number, clipCount?: number): void;
   trackUpdateAvailable(latestVersion: string): void;
+  trackScreenTime(screenName: string, durationSeconds: number): void;
   trackCustomEvent(eventName: string, props?: TelemetryProps): void;
 }

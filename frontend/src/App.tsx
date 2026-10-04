@@ -3,6 +3,7 @@ import { useMergeApp } from '@/hooks/useMergeApp';
 import { useStartupCheck } from '@/hooks/useStartupCheck';
 import { useTourManager } from '@/hooks/useTourManager';
 import { useDocumentMeta } from '@/hooks/useDocumentMeta';
+import { useScreenTimeTracking } from '@/hooks/useScreenTimeTracking';
 import { Header } from '@/components/layout/Header';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { HomeView } from '@/views/HomeView';
@@ -37,6 +38,10 @@ export function App() {
 
   // Synchronize Dynamic SEO Tags & Document Titles for Active Features
   useDocumentMeta(app.activeTab, app.playlist);
+
+  // Track active time spent on each screen (pauses on minimize, sends to Aptabase on close)
+  const activeScreenName = startupState !== 'ready' ? startupState : app.activeTab;
+  useScreenTimeTracking(activeScreenName);
 
   // Completion modal arbitration: Review modal (at 3-4 videos) vs Support modal
   useEffect(() => {

@@ -4,10 +4,11 @@
  */
 
 import React from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, useNavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { RootStackParamList } from './types';
 import { MainTabs } from './MainTabs';
+import { screenTimeTracker } from '../services/analytics';
 import {
   SplashScreen,
   HomeScreen,
@@ -24,9 +25,24 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export function AppNavigator() {
   const { colors } = useTheme();
+  const navigationRef = useNavigationContainerRef();
 
   return (
-    <NavigationContainer>
+    <NavigationContainer
+      ref={navigationRef}
+      onReady={() => {
+        const currentRoute = navigationRef.getCurrentRoute();
+        if (currentRoute?.name) {
+          screenTimeTracker.setCurrentScreen(currentRoute.name);
+        }
+      }}
+      onStateChange={() => {
+        const currentRoute = navigationRef.getCurrentRoute();
+        if (currentRoute?.name) {
+          screenTimeTracker.setCurrentScreen(currentRoute.name);
+        }
+      }}
+    >
       <Stack.Navigator
         initialRouteName="Splash"
         screenOptions={{

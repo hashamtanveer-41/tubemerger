@@ -126,6 +126,8 @@ export class ApiClient {
 
   // Telemetry
   trackEvent = (eventName: string, props?: Record<string, any>) => this.telemetry.trackEvent(eventName, props);
+  trackScreenTime = (screenName: string, durationSeconds: number) => this.telemetry.trackScreenTime(screenName, durationSeconds);
+  flushScreenTimes = (screenTimes: Record<string, number>) => this.telemetry.flushScreenTimes(screenTimes);
 
   // Feedback
   submitReview = (payload: Parameters<FeedbackEndpoints['submitReview']>[0]) =>

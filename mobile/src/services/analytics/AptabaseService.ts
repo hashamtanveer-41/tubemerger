@@ -129,6 +129,15 @@ export class AptabaseService implements ITelemetryService {
     this.track('update_available', { latest_version: latestVersion });
   }
 
+  trackScreenTime(screenName: string, durationSeconds: number): void {
+    if (durationSeconds <= 0) return;
+    this.track('screen_time', {
+      screen_name: screenName,
+      duration_seconds: Math.round(durationSeconds),
+      platform: 'android',
+    });
+  }
+
   trackCustomEvent(eventName: string, props?: TelemetryProps): void {
     this.track(eventName, props);
   }
